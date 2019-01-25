@@ -1,0 +1,24 @@
+{
+  "name": "dicomweb-server",
+  "version": "1.0.0",
+  "description": "Lightweight DICOMweb Server with CouchDB",
+  "main": "server.js",
+  "dependencies": {
+    "fastify": "^1.13.4",
+    "fastify-couchdb": "^0.2.0",
+    "fastify-static": "^1.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "DICOMweb",
+    "PACS",
+    "server",
+    "CouchDB"
+  ],
+  "author": "Emel Alkim",
+  "license": "ISC"
+}
