@@ -52,9 +52,8 @@ fastify.route({
   handler: async (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use('chronicle');
-      const body = await dicomDB.get(request.params.instance)
       reply.header('Content-Disposition', `attachment; filename=${request.params.instance}.dcm`);      
-      reply.send(fs.createReadStream(body.fileNamePath))
+      reply.send(dicomDB.attachment.getAsStream(request.params.instance, "object.dcm"))
     }
     catch(err) {
       reply.send(err);
