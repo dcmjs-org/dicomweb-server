@@ -92,7 +92,7 @@ fastify.route({
 // Run the server!
 const start = async () => {
   try {
-    await fastify.listen(5984, '0.0.0.0')
+    await fastify.listen(5985, '0.0.0.0')
     fastify.log.info(`server listening on ${fastify.server.address().port}`)
   } catch (err) {
     fastify.log.error(err)
