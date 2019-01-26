@@ -52,9 +52,8 @@ fastify.route({
   handler: async (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use('chronicle');
-      const body = await dicomDB.get(request.params.instance)
       reply.header('Content-Disposition', `attachment; filename=${request.params.instance}.dcm`);      
-      reply.send(fs.createReadStream(body.fileNamePath))
+      reply.send(dicomDB.attachment.getAsStream(request.params.instance, "object.dcm"))
     }
     catch(err) {
       reply.send(err);
@@ -92,7 +91,7 @@ fastify.route({
 // Run the server!
 const start = async () => {
   try {
-    await fastify.listen(3000)
+    await fastify.listen(5985, '0.0.0.0')
     fastify.log.info(`server listening on ${fastify.server.address().port}`)
   } catch (err) {
     fastify.log.error(err)
