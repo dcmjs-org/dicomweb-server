@@ -65,6 +65,69 @@ fastify.after(() => {
     }
   })
 
+  // WADO Retrieve Instance
+  // GET	{s}/studies/{study}/series/{series}/instances/{instance}/metadata
+  fastify.route({
+    method: 'GET',
+    url: '/studies/:study/series/:series/instances/:instance/metadata',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string'
+          },
+          series: {
+            type: 'string'
+          },
+          instance: {
+            type: 'string'
+          }
+        }
+      },
+      // filter just the fileNamePath
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            fileNamePath: { type: 'string' },
+            dataset: {
+              type: "object",
+              properties: {
+                "0020000D": {
+                  type: "object",
+                  properties: {
+                    vr: {
+                      type: "string"
+                    },
+                    Value: {
+                      type: "string"
+                    }
+                  },
+                  required: [
+                    "vr",
+                    "Value"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+   
+    handler: async (request, reply) => {
+      try {
+        const dicomDB = fastify.couch.db.use('chronicle');
+        const body = await dicomDB.get(request.params.instance)
+        reply.send(body)
+      }
+      catch(err) {
+        reply.send(err);
+      }
+    }
+  })
+
   fastify.route({
     method: 'GET',
     url: '/',
