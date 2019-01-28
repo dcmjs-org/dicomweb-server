@@ -28,7 +28,8 @@ function validate (username, password, req, reply, done) {
 
 fastify.after(() => {
   //this enables basic authentication
-  fastify.addHook('preHandler', fastify.basicAuth)
+  // disabling authentication for now 
+  // fastify.addHook('preHandler', fastify.basicAuth)
   
   // WADO Retrieve Instance
   // GET	{s}/studies/{study}/series/{series}/instances/{instance}
