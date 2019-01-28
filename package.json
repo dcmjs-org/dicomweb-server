@@ -5,6 +5,7 @@
   "main": "server.js",
   "dependencies": {
     "fastify": "^1.13.4",
+    "fastify-basic-auth": "^0.3.1",
     "fastify-couchdb": "^0.2.0",
     "fastify-static": "^1.1.0"
   },
