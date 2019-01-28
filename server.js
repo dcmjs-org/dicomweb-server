@@ -50,15 +50,6 @@ fastify.after(() => {
             type: 'string'
           }
         }
-      },
-      // filter just the fileNamePath
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            fileNamePath: { type: 'string' }
-          }
-        }
       }
     },
    
