@@ -141,11 +141,56 @@ fastify.after(() => {
             {
               type: "object",
               properties: {
-                  "00080080": {
+                "00080005": {
                   type: "object",
                   properties: {
                     Value: {
+                      type: "array",
+                      items: [
+                        {
+                          type: "string"
+                        }
+                      ]
+                    },
+                    vr: {
                       type: "string"
+                    }
+                  },
+                  required: [
+                    "Value",
+                    "vr"
+                  ]
+                },
+                "00081190": {
+                  type: "object",
+                  properties: {
+                    Value: {
+                      type: "array",
+                      items: [
+                        {
+                          type: "string"
+                        }
+                      ]
+                    },
+                    vr: {
+                      type: "string"
+                    }
+                  },
+                  required: [
+                    "Value",
+                    "vr"
+                  ]
+                },
+                "00080080": {
+                  type: "object",
+                  properties: {
+                    Value: {
+                      type: "array",
+                      items: [
+                        {
+                          type: "string"
+                        }
+                      ]
                     },
                     vr: {
                       type: "string"
@@ -160,7 +205,12 @@ fastify.after(() => {
                   type: "object",
                   properties: {
                     Value: {
-                      type: "string"
+                      type: "array",
+                      items: [
+                        {
+                          type: "string"
+                        }
+                      ]
                     },
                     vr: {
                       type: "string"
@@ -175,7 +225,17 @@ fastify.after(() => {
                   type: "object",
                   properties: {
                     Value: {
-                      type: "string"
+                      type: "array",
+                      items: [
+                        {
+                          type: "object",
+                          properties: {
+                            Alphabetic: {
+                              type: "string"
+                            }
+                          }
+                        }
+                      ]
                     },
                     vr: {
                       type: "string"
@@ -190,7 +250,12 @@ fastify.after(() => {
                   type: "object",
                   properties: {
                     Value: {
-                      type: "string"
+                      type: "array",
+                      items: [
+                        {
+                          type: "string"
+                        }
+                      ]
                     },
                     vr: {
                       type: "string"
@@ -205,7 +270,12 @@ fastify.after(() => {
                   type: "object",
                   properties: {
                     Value: {
-                      type: "string"
+                      type: "array",
+                      items: [
+                        {
+                          type: "string"
+                        }
+                      ]
                     },
                     vr: {
                       type: "string"
