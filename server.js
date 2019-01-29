@@ -157,7 +157,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 },
@@ -177,7 +176,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 },
@@ -197,7 +195,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 },
@@ -217,7 +214,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 },
@@ -242,7 +238,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 },
@@ -262,7 +257,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 },
@@ -282,7 +276,6 @@ fastify.after(() => {
                     }
                   },
                   required: [
-                    "Value",
                     "vr"
                   ]
                 }
@@ -305,11 +298,11 @@ fastify.after(() => {
             if (!error) {
               fastify.log.info(body)
               
-              result=[]
+              var res=[];
               body.rows.forEach(function(patient) {
-                result.push(patient.key)
+                res.push(patient.key);
               });
-              reply.send(result)
+              reply.send(JSON.stringify(res));
             }else{
               fastify.log.info(error)
             }
