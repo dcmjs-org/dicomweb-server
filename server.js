@@ -1159,10 +1159,10 @@ fastify.after(() => {
   })
 
   // QIDO Retrieve Studies
-  // GET	{s}/studies/
+  // GET	{s}/studies
   fastify.route({
     method: 'GET',
-    url: '/studies/',
+    url: '/studies',
     schema: {
       response: {
         200: 'studies_schema#'
@@ -1183,7 +1183,9 @@ fastify.after(() => {
               
               var res=[];
               body.rows.forEach(function(study) {
-                res.push(study.key);
+                study.key[1]["00201208"].Value=[]
+                study.key[1]["00201208"].Value.push(study.value);
+                res.push(study.key[1]);
               });
               reply.send(JSON.stringify(res));
             }else{
@@ -1235,6 +1237,8 @@ fastify.after(() => {
               var res=[];
               body.rows.forEach(function(series) {
                 //get the actual instance object (tags only)
+                series.key[2]["00201209"].Value=[]
+                series.key[2]["00201209"].Value.push(series.value);
                 res.push(series.key[2]);
               });
               reply.send(JSON.stringify(res));
