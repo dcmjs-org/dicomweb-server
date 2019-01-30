@@ -26,6 +26,381 @@ function validate (username, password, req, reply, done) {
   }
 }
 
+//schemas
+fastify.addSchema( {
+  "$id": "studies_schema",
+  type: "array",
+  items: [
+    {
+      type: "object",
+      properties: {
+        "00080005": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080020": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080030": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080050": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080054": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080056": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080061": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                },
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080090": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "object",
+                  properties: {
+                    Alphabetic: {
+                      type: "string"
+                    }
+                  },
+                  required: [
+                    "Alphabetic"
+                  ]
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00081190": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00100010": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "object",
+                  properties: {
+                    Alphabetic: {
+                      type: "string"
+                    }
+                  },
+                  required: [
+                    "Alphabetic"
+                  ]
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00100020": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00100030": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00100040": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "0020000D": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00200010": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00201206": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00201208": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        }
+      },
+      required: [
+        "00080005",
+        "00080020",
+        "00080030",
+        "00080050",
+        "00080054",
+        "00080056",
+        "00080061",
+        "00080090",
+        "00081190",
+        "00100010",
+        "00100020",
+        "00100030",
+        "00100040",
+        "0020000D",
+        "00200010",
+        "00201206",
+        "00201208"
+      ]
+    }   
+  ]
+}
+);
+
 fastify.after(() => {
   //this enables basic authentication
   // disabling authentication for now 
@@ -316,7 +691,46 @@ fastify.after(() => {
     }
   })
 
-  
+  // QIDO Retrieve Studies
+  // GET	{s}/studies/
+  fastify.route({
+    method: 'GET',
+    url: '/studies/',
+    schema: {
+      response: {
+        200: 'studies_schema#'
+      }
+    },
+   
+    handler: async (request, reply) => {
+      try {
+        const dicomDB = fastify.couch.db.use('chronicle');
+        const body = await dicomDB.view('instances', 'qido_study', 
+          {
+            reduce: true, 
+            group_level: 2
+          },
+          function(error, body) {
+            if (!error) {
+              fastify.log.info(body)
+              
+              var res=[];
+              body.rows.forEach(function(study) {
+                res.push(study.key);
+              });
+              reply.send(JSON.stringify(res));
+            }else{
+              fastify.log.info(error)
+            }
+        });
+      }
+      catch(err) {
+        reply.send(err);
+      }
+    }
+  })
+
+
   
   fastify.route({
     method: 'GET',
