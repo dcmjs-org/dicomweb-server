@@ -398,8 +398,7 @@ fastify.addSchema( {
       ]
     }   
   ]
-}
-);
+});
 
 fastify.addSchema({
   "$id": "series_schema",
@@ -613,7 +612,261 @@ fastify.addSchema({
       ]
     }
   ]
-})
+});
+
+fastify.addSchema({
+  "$id": "instances_schema",
+  type: "array",
+  items: [
+    {
+      type: "object",
+      properties: {
+        "00080005": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080016": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080018": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080054": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080056": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00081190": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "0020000D": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "0020000E": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00200013": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00280010": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00280011": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00280100": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        }
+      },
+      required: [
+        "00080005",
+        "00080016",
+        "00080018",
+        "00080054",
+        "00080056",
+        "00081190",
+        "0020000D",
+        "0020000E",
+        "00200013",
+        "00280010",
+        "00280011",
+        "00280100"
+      ]
+    }
+  ]
+});
 
 fastify.after(() => {
   //this enables basic authentication
@@ -945,7 +1198,7 @@ fastify.after(() => {
   })
 
   // QIDO Retrieve Series
-  // GET	{s}/studies/
+  // GET	{s}/studies/:study/series
   fastify.route({
     method: 'GET',
     url: '/studies/:study/series',
@@ -981,7 +1234,8 @@ fastify.after(() => {
               
               var res=[];
               body.rows.forEach(function(series) {
-                res.push(series.key);
+                //get the actual instance object (tags only)
+                res.push(series.key[2]);
               });
               reply.send(JSON.stringify(res));
             }else{
@@ -995,6 +1249,59 @@ fastify.after(() => {
     }
   })
   
+  // QIDO Retrieve Instances
+  // GET	{s}/studies/:study/series/:series/instances
+  fastify.route({
+    method: 'GET',
+    url: '/studies/:study/series/:series/instances',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string'
+          },
+          series: {
+            type: 'string'
+          }
+        }
+      },
+      response: {
+        200: 'instances_schema#'
+      }
+    },
+   
+    handler: async (request, reply) => {
+      try {
+        fastify.log.info(request.params.study);
+            
+        const dicomDB = fastify.couch.db.use('chronicle');
+        const body = await dicomDB.view('instances', 'qido_instances', 
+          {
+            startkey: [request.params.study,request.params.series,""],
+            endkey: [request.params.study+"\u9999",request.params.series+"\u9999","{}"],
+            reduce: true, 
+            group_level: 4
+          },
+          function(error, body) {
+            if (!error) {
+              var res=[];
+              body.rows.forEach(function(instance) {
+                //get the actual instance object (tags only)
+                res.push(instance.key[3]);
+              });
+              reply.send(JSON.stringify(res));
+            }else{
+              fastify.log.info(error)
+            }
+        });
+      }
+      catch(err) {
+        reply.send(err);
+      }
+    }
+  })
+
   fastify.route({
     method: 'GET',
     url: '/',
