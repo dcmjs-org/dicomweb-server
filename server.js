@@ -401,6 +401,220 @@ fastify.addSchema( {
 }
 );
 
+fastify.addSchema({
+  "$id": "series_schema",
+  type: "array",
+  items: [
+    {
+      type: "object",
+      properties: {
+        "00080005": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080054": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080056": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00080060": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "0008103E": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00081190": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "0020000D": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "0020000E": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "string"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00200011": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        },
+        "00201209": {
+          type: "object",
+          properties: {
+            vr: {
+              type: "string"
+            },
+            Value: {
+              type: "array",
+              items: [
+                {
+                  type: "integer"
+                }
+              ]
+            }
+          },
+          required: [
+            "vr"
+          ]
+        }
+      },
+      required: [
+        "00080005",
+        "00080054",
+        "00080056",
+        "00080060",
+        "0008103E",
+        "00081190",
+        "0020000D",
+        "0020000E",
+        "00200011",
+        "00201209"
+      ]
+    }
+  ]
+})
+
 fastify.after(() => {
   //this enables basic authentication
   // disabling authentication for now 
@@ -730,7 +944,56 @@ fastify.after(() => {
     }
   })
 
-
+  // QIDO Retrieve Series
+  // GET	{s}/studies/
+  fastify.route({
+    method: 'GET',
+    url: '/studies/:study/series',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string'
+          }
+        }
+      },
+      response: {
+        200: 'series_schema#'
+      }
+    },
+   
+    handler: async (request, reply) => {
+      try {
+        fastify.log.info(request.params.study);
+            
+        const dicomDB = fastify.couch.db.use('chronicle');
+        const body = await dicomDB.view('instances', 'qido_series', 
+          {
+            startkey: [request.params.study,""],
+            endkey: [request.params.study+"\u9999","{}"],
+            reduce: true, 
+            group_level: 3
+          },
+          function(error, body) {
+            if (!error) {
+              fastify.log.info(body)
+              
+              var res=[];
+              body.rows.forEach(function(series) {
+                res.push(series.key);
+              });
+              reply.send(JSON.stringify(res));
+            }else{
+              fastify.log.info(error)
+            }
+        });
+      }
+      catch(err) {
+        reply.send(err);
+      }
+    }
+  })
   
   fastify.route({
     method: 'GET',
