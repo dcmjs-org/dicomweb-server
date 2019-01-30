@@ -1172,6 +1172,25 @@ fastify.after(() => {
     handler: async (request, reply) => {
       try {
         const dicomDB = fastify.couch.db.use('chronicle');
+        var seriesCounts={};
+        const bodySeriesCounts = await dicomDB.view('instances', 'qido_study_series', 
+          {
+            reduce: true, 
+            group_level: 1
+          },
+          function(error, bodySeriesCounts) {
+            if (!error) {
+              
+              bodySeriesCounts.rows.forEach(function(study) {
+                seriesCounts[study.key[0]]=study.value;
+              });
+              
+            }else{
+              fastify.log.info(error)
+            }
+          });
+        
+        fastify.log.info(seriesCounts);
         const body = await dicomDB.view('instances', 'qido_study', 
           {
             reduce: true, 
@@ -1185,6 +1204,8 @@ fastify.after(() => {
               body.rows.forEach(function(study) {
                 study.key[1]["00201208"].Value=[]
                 study.key[1]["00201208"].Value.push(study.value);
+                study.key[1]["00201206"].Value=[]
+                study.key[1]["00201206"].Value.push(seriesCounts[study.key[0]]);
                 res.push(study.key[1]);
               });
               reply.send(JSON.stringify(res));
@@ -1192,6 +1213,7 @@ fastify.after(() => {
               fastify.log.info(error)
             }
         });
+        
       }
       catch(err) {
         reply.send(err);
