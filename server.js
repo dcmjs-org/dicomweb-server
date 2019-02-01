@@ -55,6 +55,12 @@ class DICOMZero {
     return(dataset);
   }
 
+  static dictAndDatasetFromArrayBuffer(arrayBuffer) {
+    let dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer);
+    let dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    dataset._meta = dcmjs.data.DicomMetaDictionary.namifyDataset(dicomData.meta);
+    return({dict:dicomData.dict,dataset:dataset});
+  }
   // return a function to use as the 'onload' callback for the file reader.
   // The function takes a progress event argument and it knows (from this class instance)
   // when all files have been read so it can invoke the doneCallback when all
@@ -1619,12 +1625,21 @@ fastify.route({
     // dicomwc=new dicomweb_client.api.DICOMwebClient({"url" : "noURL"});
     res=dicomweb_client.message.multipartDecode(request.body);
     ab = toArrayBuffer(res)
-
-    dataset = DICOMZero.datasetFromArrayBuffer(ab);
-    console.log(dataset)
-
+    var dicomAttach = {
+      name: 'object.dcm', 
+      data: ab,
+      content_type: ''
+    };
+    
+    dictDataset = DICOMZero.dictAndDatasetFromArrayBuffer(ab);
+    // console.log(dataset)
+    couchDoc={
+      '_id':dictDataset.dataset.SOPInstanceUID,
+      dataset:dictDataset.dict
+    }
     const dicomDB = fastify.couch.db.use('chronicle');
-    dicomDB.insert(dataset, function(err, body) {
+    dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id, function(err, body) {
+      console.log(err)
       if (!err)
         console.log(body);
     });
