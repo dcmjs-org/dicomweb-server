@@ -26,6 +26,7 @@ function validate (username, password, req, reply, done) {
   }
 }
 
+
 //schemas
 fastify.addSchema( {
   "$id": "studies_schema",
@@ -926,43 +927,28 @@ fastify.after(() => {
             type: 'string'
           }
         }
-      },
-      // filter just the fileNamePath
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            fileNamePath: { type: 'string' },
-            dataset: {
-              type: "object",
-              properties: {
-                "0020000D": {
-                  type: "object",
-                  properties: {
-                    vr: {
-                      type: "string"
-                    },
-                    Value: {
-                      type: "string"
-                    }
-                  },
-                  required: [
-                    "vr",
-                    "Value"
-                  ]
-                }
-              }
-            }
-          }
-        }
       }
     },
    
     handler: async (request, reply) => {
       try {
         const dicomDB = fastify.couch.db.use('chronicle');
-        const body = await dicomDB.get(request.params.instance)
-        reply.send(body)
+        const body = await dicomDB.view('instances', 'wado_metadata', 
+          {
+            key: [request.params.study,request.params.series,request.params.instance]
+          },
+          function(error, body) {
+            if (!error) {
+              var res=[];
+              body.rows.forEach(function(instance) {
+                //get the actual instance object (tags only)
+                res.push(instance.value);
+              });
+              reply.send(JSON.stringify(res));
+            }else{
+              fastify.log.info(error)
+            }
+        });
       }
       catch(err) {
         reply.send(err);
