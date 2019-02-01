@@ -4,10 +4,14 @@
   "description": "Lightweight DICOMweb Server with CouchDB",
   "main": "server.js",
   "dependencies": {
+    "dcmjs": "^0.3.1-build-26",
+    "dicomweb-client": "^0.4.1",
     "fastify": "^1.13.4",
     "fastify-basic-auth": "^0.3.1",
     "fastify-couchdb": "^0.2.0",
-    "fastify-static": "^1.1.0"
+    "fastify-static": "^1.1.0",
+    "to-array-buffer": "^3.2.0",
+    "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {},
   "scripts": {
