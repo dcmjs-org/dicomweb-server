@@ -1337,7 +1337,7 @@ fastify.after(() => {
         const body = await dicomDB.view('instances', 'wado_metadata', 
           {
             startkey: [request.params.study,"",""],
-            endkey: [request.params.study+"\u9999",{},"{}"]
+            endkey: [request.params.study+"\u9999",{},{}]
           },
           function(error, body) {
             if (!error) {
