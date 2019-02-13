@@ -1,0 +1,253 @@
+{
+  "$id": "instances_schema",
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "00080005": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00080016": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00080018": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00080054": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00080056": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00081190": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "0020000D": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "0020000E": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00200013": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00280010": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00280011": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00280100": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        }
+      },
+      "required": [
+        "00080005",
+        "00080016",
+        "00080018",
+        "00080054",
+        "00080056",
+        "00081190",
+        "0020000D",
+        "0020000E",
+        "00200013",
+        "00280010",
+        "00280011",
+        "00280100"
+      ]
+    }
+  ]
+}
