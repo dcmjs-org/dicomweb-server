@@ -204,7 +204,7 @@ fastify.addSchema(series_schema);
 fastify.addSchema(instances_schema);
 
 //register CouchDB plugin we created
-fastify.register(require('./controllers/CouchDB'),{
+fastify.register(require('./plugins/CouchDB'),{
   url: 'http://localhost:5984'
 })
 //register routes
