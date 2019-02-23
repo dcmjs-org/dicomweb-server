@@ -38,50 +38,59 @@ async function couchdb (fastify, options, next) {
 
 
     //add accessor methods with decorate
-    fastify.decorate('getQIDOStudies' , async (request, reply) => {
+    fastify.decorate('getQIDOStudies' , (request, reply) => {
         try {
             const dicomDB = fastify.couch.db.use('chronicle');
-            var seriesCounts={};
-            const bodySeriesCounts = await dicomDB.view('instances', 'qido_study_series', 
-            {
-                reduce: true, 
-                group_level: 1
-            },
-            function(error, bodySeriesCounts) {
-                if (!error) {
-                
-                bodySeriesCounts.rows.forEach(function(study) {
-                    seriesCounts[study.key[0]]=study.value;
-                });
-                
-                }else{
-                fastify.log.info(error)
-                }
+            
+            const bodySeriesCounts = new Promise((resolve) => {
+                dicomDB.view('instances', 'qido_study_series', 
+                {
+                    reduce: true, 
+                    group_level: 1
+                },
+                function(error, bodySeriesCounts) {
+                    if (!error) {
+                        var seriesCounts={};
+                        bodySeriesCounts.rows.forEach(function(study) {
+                            seriesCounts[study.key[0]]=study.value;
+                        });
+                        resolve(seriesCounts);
+                    }else{
+                        reject(error)
+                    }
+                })
             });
             
-            fastify.log.info(seriesCounts);
-            const body = await dicomDB.view('instances', 'qido_study', 
-            {
-                reduce: true, 
-                group_level: 2
-            },
-            function(error, body) {
-                if (!error) {
-                fastify.log.info(body)
-                
+            const body = new Promise( (resolve, reject) => {
+                dicomDB.view('instances', 'qido_study', 
+                {
+                    reduce: true, 
+                    group_level: 2
+                },
+                function(error, body) {
+                    if (!error) {
+                        resolve(body);
+                    
+                    
+                    }else{
+                        reject(error)
+                    }
+                })
+            });
+            
+            Promise.all([bodySeriesCounts,body]).then(function(values) {
                 var res=[];
-                body.rows.forEach(function(study) {
+                values[1].rows.forEach(function(study) {
                     study.key[1]["00201208"].Value=[]
                     study.key[1]["00201208"].Value.push(study.value);
                     study.key[1]["00201206"].Value=[]
-                    study.key[1]["00201206"].Value.push(seriesCounts[study.key[0]]);
+                    study.key[1]["00201206"].Value.push(values[0][study.key[0]]);
                     res.push(study.key[1]);
                 });
                 reply.send(JSON.stringify(res));
-                }else{
-                fastify.log.info(error)
-                }
-            });
+              }).catch(function(err) {
+                reply.send(err);
+              });
             
         }
         catch(err) {
