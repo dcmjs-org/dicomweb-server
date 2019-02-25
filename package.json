@@ -9,11 +9,16 @@
     "fastify": "^1.13.4",
     "fastify-basic-auth": "^0.3.1",
     "fastify-couchdb": "^0.2.0",
+    "fastify-plugin": "^1.5.0",
     "fastify-static": "^1.1.0",
     "to-array-buffer": "^3.2.0",
     "xmlhttprequest": "^1.8.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^5.14.1",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"

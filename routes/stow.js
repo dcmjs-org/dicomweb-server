@@ -1,21 +1,20 @@
-//defines stow route
-async function stow_routes (fastify, options) {
-    fastify.route({
-        method: 'POST',
-        url: '/studies/:study',
-        schema: {
-          params: {
-              type: 'object',
-              properties: {
-              study: {
-                  type: 'string'
-              }
-            }
-          }
+// defines stow route
+async function stowRoutes(fastify) {
+  fastify.route({
+    method: 'POST',
+    url: '/studies/:study',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string',
+          },
         },
-        handler: fastify.stow
-      }
-    )
+      },
+    },
+    handler: fastify.stow,
+  });
 }
 
-module.exports = stow_routes
+module.exports = stowRoutes;
