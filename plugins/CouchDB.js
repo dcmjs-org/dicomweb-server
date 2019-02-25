@@ -9,6 +9,7 @@ const viewsjs = require('../config/views');
 
 async function couchdb(fastify, options, next) {
   // register couchdb
+  // disables eslint check as I want this module to be standalone to be (un)pluggable
   fastify.register(require('fastify-couchdb'), { // eslint-disable-line global-require
     url: options.url,
   });
