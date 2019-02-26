@@ -257,13 +257,14 @@ async function couchdb(fastify, options, next) {
             body.rows.forEach((patient) => {
               res.push(patient.key);
             });
-            reply.send(JSON.stringify(res));
+            reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(res);
           } else {
             fastify.log.info(error);
+            reply.code(500).send(error);
           }
         });
     } catch (err) {
-      reply.send(err);
+      reply.code(500).send(err);
     }
   });
 

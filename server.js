@@ -34,7 +34,7 @@ fastify.register(require('./plugins/CouchDB'), {
 // this should be done after CouchDB plugin to be able to use the accessor methods
 fastify.register(require('./routes/qido'));
 fastify.register(require('./routes/wado'));
-fastify.register(require('./routes/stow'));
+// fastify.register(require('./routes/stow'));
 fastify.register(require('./routes/other'));
 
 fastify.after(() => {
