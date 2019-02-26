@@ -14,7 +14,7 @@ async function couchdb(fastify, options, next) {
     url: options.url,
   });
 
-  // // Update the views in couchdb with the ones defined in the code
+  // Update the views in couchdb with the ones defined in the code
   fastify.decorate('checkCouchDBViews', async () => {
     const dicomDB = fastify.couch.db.use('chronicle');
     dicomDB.get('_design/instances', (e, b) => { // create view
