@@ -1,4 +1,5 @@
 const fp = require('fastify-plugin');
+const config = require('../config/index');
 
 // const toArrayBuffer = require('to-array-buffer');
 // const dicomwebClient = require('dicomweb-client');
@@ -7,21 +8,57 @@ const fp = require('fastify-plugin');
 
 const viewsjs = require('../config/views');
 
-async function couchdb(fastify, options, next) {
+function couchdb(fastify, options, next) {
   // register couchdb
   // disables eslint check as I want this module to be standalone to be (un)pluggable
   fastify.register(require('fastify-couchdb'), { // eslint-disable-line global-require
     url: options.url,
+  }).ready(() => {
+    // for some reason they don't work sequentially. the second
+    // fails because the first is not complete.
+    fastify.checkAndCreateDb(config.db);
+    fastify.checkCouchDBViews();
+    // need to add hook for close to remove the db if test;
+    // fastify.addHook('onClose', (instance, done) => {
+    //   console.log('hook');
+    //   console.log(config.env);
+    //   if (config.env === 'test') { // if it is test remove the database
+    //     fastify.couch.db.destroy(config.db);
+    //     console.log('destroying');
+    //   }
+    //   done();
+    // });
+    // await fastify.ready();
+    // }
   });
 
   // Update the views in couchdb with the ones defined in the code
-  fastify.decorate('checkCouchDBViews', async () => {
-    const dicomDB = fastify.couch.db.use('chronicle');
+  fastify.decorate('checkAndCreateDb', (dbName) => {
+    fastify.couch.db.list((error, databases) => {
+      if (error) {
+        console.log('ERROR :: nano.db.list - %s', JSON.stringify(error));
+      }
+      if (databases.indexOf(dbName) < 0) {
+        fastify.couch.db.create(dbName, (err) => {
+          if (err) {
+            console.log('ERROR :: %s', JSON.stringify(error));
+          } else {
+            fastify.log.info(`Creating database ${config.db}`);
+          }
+        });
+      }
+    });
+  });
+
+  // Update the views in couchdb with the ones defined in the code
+  fastify.decorate('checkCouchDBViews', () => {
+    const dicomDB = fastify.couch.db.use(config.db);
     dicomDB.get('_design/instances', (e, b) => { // create view
-      const viewDoc = b;
+      let viewDoc = b;
       if (e) {
-        fastify.log.info(`Error getting the design document ${e.message}`);
-        return;
+        fastify.log.info(`Error getting the design document ${e.message}. Creating an empty one!`);
+        viewDoc = {};
+        viewDoc.views = {};
       }
       const keys = Object.keys(viewsjs.views);
       const values = Object.values(viewsjs.views);
@@ -38,7 +75,7 @@ async function couchdb(fastify, options, next) {
   // add accessor methods with decorate
   fastify.decorate('getQIDOStudies', (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
 
       const bodySeriesCounts = new Promise((resolve, reject) => {
         dicomDB.view('instances', 'qido_study_series',
@@ -97,7 +134,7 @@ async function couchdb(fastify, options, next) {
     try {
       fastify.log.info(request.params.study);
 
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       await dicomDB.view('instances', 'qido_series',
         {
           startkey: [request.params.study, ''],
@@ -131,7 +168,7 @@ async function couchdb(fastify, options, next) {
     try {
       fastify.log.info(request.params.study);
 
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       await dicomDB.view('instances', 'qido_instances',
         {
           startkey: [request.params.study, request.params.series, ''],
@@ -156,9 +193,9 @@ async function couchdb(fastify, options, next) {
     }
   });
 
-  fastify.decorate('retrieveInstance', async (request, reply) => {
+  fastify.decorate('retrieveInstance', (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       reply.header('Content-Disposition', `attachment; filename=${request.params.instance}.dcm`);
       reply.send(dicomDB.attachment.getAsStream(request.params.instance, 'object.dcm'));
     } catch (err) {
@@ -168,7 +205,7 @@ async function couchdb(fastify, options, next) {
 
   fastify.decorate('getStudyMetadata', async (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       await dicomDB.view('instances', 'wado_metadata',
         {
           startkey: [request.params.study, '', ''],
@@ -193,7 +230,7 @@ async function couchdb(fastify, options, next) {
 
   fastify.decorate('getSeriesMetadata', async (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       await dicomDB.view('instances', 'wado_metadata',
         {
           startkey: [request.params.study, request.params.series, ''],
@@ -218,7 +255,7 @@ async function couchdb(fastify, options, next) {
 
   fastify.decorate('getInstanceMetadata', async (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       await dicomDB.view('instances', 'wado_metadata',
         {
           key: [request.params.study, request.params.series, request.params.instance],
@@ -243,7 +280,7 @@ async function couchdb(fastify, options, next) {
 
   fastify.decorate('getPatients', async (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use('chronicle');
+      const dicomDB = fastify.couch.db.use(config.db);
       await dicomDB.view('instances', 'patients',
         {
           reduce: true,
@@ -257,7 +294,7 @@ async function couchdb(fastify, options, next) {
             body.rows.forEach((patient) => {
               res.push(patient.key);
             });
-            reply.code(200).header('Content-Type', 'application/json; charset=utf-8').send(res);
+            reply.code(200).send(res);
           } else {
             fastify.log.info(error);
             reply.code(500).send(error);
@@ -284,7 +321,7 @@ async function couchdb(fastify, options, next) {
   //     _id: dictDataset.dataset.SOPInstanceUID,
   //     dataset: dictDataset.dict,
   //   };
-  //   const dicomDB = fastify.couch.db.use('chronicle');
+  //   const dicomDB = fastify.couch.db.use(config.db);
   //   dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id, (err, body) => {
   //     console.log(err);
   //     if (!err) console.log(body);

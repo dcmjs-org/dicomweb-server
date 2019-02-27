@@ -2,6 +2,7 @@
 const fastify = require('fastify')({
   logger: true,
 });
+const config = require('./config/index');
 
 fastify.addContentTypeParser('*', (req, done) => {
   // done()
@@ -25,10 +26,10 @@ fastify.addSchema(patientsSchema);
 fastify.addSchema(studiesSchema);
 fastify.addSchema(seriesSchema);
 fastify.addSchema(instancesSchema);
-
+console.log(`using db ${config.db}`);
 // register CouchDB plugin we created
 fastify.register(require('./plugins/CouchDB'), {
-  url: 'http://localhost:5984',
+  url: (`${config.dbServer}:${config.dbPort}`),
 });
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
@@ -60,20 +61,13 @@ fastify.after(() => {
         },
       },
     },
-    handler: async (request, reply) => (reply.send({ hello: 'world' })),
+    handler: (request, reply) => (reply.send({ hello: 'world' })),
   });
 });
 
-
+const port = process.env.port || '5985';
+const host = process.env.host || '0.0.0.0';
 // Run the server!
-const start = async () => {
-  try {
-    await fastify.listen(5985, '0.0.0.0');
-    fastify.log.info(`server listening on ${fastify.server.address().port}`);
-    fastify.checkCouchDBViews();
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
-start();
+fastify.listen(port, host);
+
+module.exports = fastify;
