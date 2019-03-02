@@ -27,21 +27,23 @@ fastify.addSchema(studiesSchema);
 fastify.addSchema(seriesSchema);
 fastify.addSchema(instancesSchema);
 console.log(`using db ${config.db}`);
+// (async () => {
 // register CouchDB plugin we created
-fastify.register(require('./plugins/CouchDB'), {
+fastify.register(require('./plugins/CouchDB'), { // eslint-disable-line global-require
   url: (`${config.dbServer}:${config.dbPort}`),
 });
-// register routes
-// this should be done after CouchDB plugin to be able to use the accessor methods
-fastify.register(require('./routes/qido'));
-fastify.register(require('./routes/wado'));
-// fastify.register(require('./routes/stow'));
-fastify.register(require('./routes/other'));
+// })();
 
 fastify.after(() => {
   // this enables basic authentication
   // disabling authentication for now
   // fastify.addHook('preHandler', fastify.basicAuth)
+  // register routes
+  // this should be done after CouchDB plugin to be able to use the accessor methods
+  fastify.register(require('./routes/qido')); // eslint-disable-line global-require
+  fastify.register(require('./routes/wado')); // eslint-disable-line global-require
+  // fastify.register(require('./routes/stow'));
+  fastify.register(require('./routes/other')); // eslint-disable-line global-require
 
   fastify.route({
     method: 'GET',
@@ -69,5 +71,10 @@ const port = process.env.port || '5985';
 const host = process.env.host || '0.0.0.0';
 // Run the server!
 fastify.listen(port, host);
-
+console.log('started listening');
+// fastify.ready(async (done) => {
+//   await fastify.checkAndCreateDb();
+//   console.log('plugin ready');
+//   done();
+// });
 module.exports = fastify;

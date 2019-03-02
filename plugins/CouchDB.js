@@ -8,69 +8,40 @@ const config = require('../config/index');
 
 const viewsjs = require('../config/views');
 
-function couchdb(fastify, options, next) {
-  // register couchdb
-  // disables eslint check as I want this module to be standalone to be (un)pluggable
-  fastify.register(require('fastify-couchdb'), { // eslint-disable-line global-require
-    url: options.url,
-  }).ready(() => {
-    // for some reason they don't work sequentially. the second
-    // fails because the first is not complete.
-    fastify.checkAndCreateDb(config.db);
-    fastify.checkCouchDBViews();
-    // need to add hook for close to remove the db if test;
-    // fastify.addHook('onClose', (instance, done) => {
-    //   console.log('hook');
-    //   console.log(config.env);
-    //   if (config.env === 'test') { // if it is test remove the database
-    //     fastify.couch.db.destroy(config.db);
-    //     console.log('destroying');
-    //   }
-    //   done();
-    // });
-    // await fastify.ready();
-    // }
-  });
-
+async function couchdb(fastify, options, next) {
   // Update the views in couchdb with the ones defined in the code
-  fastify.decorate('checkAndCreateDb', (dbName) => {
-    fastify.couch.db.list((error, databases) => {
-      if (error) {
-        console.log('ERROR :: nano.db.list - %s', JSON.stringify(error));
-      }
-      if (databases.indexOf(dbName) < 0) {
-        fastify.couch.db.create(dbName, (err) => {
-          if (err) {
-            console.log('ERROR :: %s', JSON.stringify(error));
-          } else {
-            fastify.log.info(`Creating database ${config.db}`);
-          }
-        });
-      }
-    });
-  });
-
-  // Update the views in couchdb with the ones defined in the code
-  fastify.decorate('checkCouchDBViews', () => {
-    const dicomDB = fastify.couch.db.use(config.db);
-    dicomDB.get('_design/instances', (e, b) => { // create view
-      let viewDoc = b;
-      if (e) {
-        fastify.log.info(`Error getting the design document ${e.message}. Creating an empty one!`);
-        viewDoc = {};
-        viewDoc.views = {};
+  fastify.decorate('checkAndCreateDb', () => new Promise(async (resolve, reject) => {
+    console.log('db start');
+    const databases = await fastify.couch.db.list();
+    if (databases.indexOf(config.db) < 0) {
+      await fastify.couch.db.create(config.db);
+      const dicomDB = fastify.couch.db.use(config.db);
+      let viewDoc = {};
+      viewDoc.views = {};
+      try {
+        viewDoc = await dicomDB.get('_design/instances');
+      } catch (e) {
+        fastify.log.info('View document not found! Creating new one');
       }
       const keys = Object.keys(viewsjs.views);
       const values = Object.values(viewsjs.views);
       for (let i = 0; i < keys.length; i += 1) {
         viewDoc.views[keys[i]] = values[i];
       }
-      dicomDB.insert(viewDoc, '_design/instances', (insertErr) => {
-        if (insertErr) { fastify.log.info(`Error updating the design document ${e.message}`); } else fastify.log.info('Design document updated successfully ');
+      await dicomDB.insert(viewDoc, '_design/instances', (insertErr) => {
+        if (insertErr) {
+          fastify.log.info(`Error updating the design document ${insertErr.message}`);
+          reject();
+        } else {
+          fastify.log.info('Design document updated successfully ');
+          resolve();
+        }
+        console.log('done with view');
       });
-    });
-  });
-
+      console.log('done with db');
+    }
+    resolve();
+  }));
 
   // add accessor methods with decorate
   fastify.decorate('getQIDOStudies', (request, reply) => {
@@ -329,7 +300,25 @@ function couchdb(fastify, options, next) {
   //   reply.send('success');
   // });
 
-  next();
+  // register couchdb
+  // disables eslint check as I want this module to be standalone to be (un)pluggable
+  fastify.register(require('fastify-couchdb'), { // eslint-disable-line global-require
+    url: options.url,
+  });
+  // await fastify.checkAndCreateDb();
+  fastify.after(async () => {
+    await fastify.checkAndCreateDb();
+    // need to add hook for close to remove the db if test;
+    fastify.addHook('onClose', (instance, done) => {
+      console.log('hook');
+      if (config.env === 'test') { // if it is test remove the database
+        instance.couch.db.destroy(config.db);
+        console.log('destroying');
+        done();
+      }
+    });
+    next();
+  });
 }
 // expose as plugin so the module using it can access the decorated methods
 module.exports = fp(couchdb);

@@ -7,10 +7,16 @@ const { expect } = chai;
 
 describe('Patients API', () => {
   let server;
-  before(() => {
+  before((done) => {
     process.env.host = '0.0.0.0';
     process.env.port = 5987;
     server = require('../server'); // eslint-disable-line
+    // await server.ready();
+    server.ready(async () => {
+      await server.checkAndCreateDb();
+      console.log('ready');
+      done();
+    });
   });
   after(() => {
     server.close();
