@@ -7,7 +7,9 @@ const config = require('./config/index');
 fastify.addContentTypeParser('*', (req, done) => {
   // done()
   let data = [];
-  req.on('data', (chunk) => { data.push(chunk); });
+  req.on('data', chunk => {
+    data.push(chunk);
+  });
   req.on('end', () => {
     // console.log(data)
     data = Buffer.concat(data);
@@ -26,13 +28,11 @@ fastify.addSchema(patientsSchema);
 fastify.addSchema(studiesSchema);
 fastify.addSchema(seriesSchema);
 fastify.addSchema(instancesSchema);
-console.log(`using db ${config.db}`);
-// (async () => {
+
 // register CouchDB plugin we created
-fastify.register(require('./plugins/CouchDB'), { // eslint-disable-line global-require
-  url: (`${config.dbServer}:${config.dbPort}`),
+fastify.register(require('./plugins/CouchDB'), {
+  url: `${config.dbServer}:${config.dbPort}`,
 });
-// })();
 
 fastify.after(() => {
   // this enables basic authentication
@@ -63,7 +63,7 @@ fastify.after(() => {
         },
       },
     },
-    handler: (request, reply) => (reply.send({ hello: 'world' })),
+    handler: (request, reply) => reply.send({ hello: 'world' }),
   });
 });
 
@@ -71,10 +71,5 @@ const port = process.env.port || '5985';
 const host = process.env.host || '0.0.0.0';
 // Run the server!
 fastify.listen(port, host);
-console.log('started listening');
-// fastify.ready(async (done) => {
-//   await fastify.checkAndCreateDb();
-//   console.log('plugin ready');
-//   done();
-// });
+
 module.exports = fastify;

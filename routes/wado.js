@@ -39,12 +39,10 @@ async function wadoRoutes(fastify) {
           },
         },
       },
-
     },
 
     handler: fastify.getStudyMetadata,
   });
-
 
   // WADO Retrieve Series Metadata
   // GET {s}/studies/{study}/series/{series}/metadata
