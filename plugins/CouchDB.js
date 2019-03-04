@@ -106,7 +106,7 @@ async function couchdb(fastify, options, next) {
             studySeriesObj['00201206'].Value.push(values[0][study.key[0]]);
             res.push(studySeriesObj);
           });
-          reply.send(JSON.stringify(res));
+          reply.send(res);
         })
         .catch(err => {
           reply.send(err);
@@ -116,12 +116,12 @@ async function couchdb(fastify, options, next) {
     }
   });
 
-  fastify.decorate('getQIDOSeries', async (request, reply) => {
+  fastify.decorate('getQIDOSeries', (request, reply) => {
     try {
       fastify.log.info(request.params.study);
 
       const dicomDB = fastify.couch.db.use(config.db);
-      await dicomDB.view(
+      dicomDB.view(
         'instances',
         'qido_series',
         {
@@ -142,7 +142,7 @@ async function couchdb(fastify, options, next) {
               seriesObj['00201209'].Value.push(series.value);
               res.push(seriesObj);
             });
-            reply.send(JSON.stringify(res));
+            reply.send(res);
           } else {
             fastify.log.info(error);
           }
@@ -153,12 +153,12 @@ async function couchdb(fastify, options, next) {
     }
   });
 
-  fastify.decorate('getQIDOInstances', async (request, reply) => {
+  fastify.decorate('getQIDOInstances', (request, reply) => {
     try {
       fastify.log.info(request.params.study);
 
       const dicomDB = fastify.couch.db.use(config.db);
-      await dicomDB.view(
+      dicomDB.view(
         'instances',
         'qido_instances',
         {
@@ -174,7 +174,7 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.key[3]);
             });
-            reply.send(JSON.stringify(res));
+            reply.send(res);
           } else {
             fastify.log.info(error);
           }
@@ -195,10 +195,10 @@ async function couchdb(fastify, options, next) {
     }
   });
 
-  fastify.decorate('getStudyMetadata', async (request, reply) => {
+  fastify.decorate('getStudyMetadata', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
-      await dicomDB.view(
+      dicomDB.view(
         'instances',
         'wado_metadata',
         {
@@ -212,7 +212,7 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
-            reply.send(JSON.stringify(res));
+            reply.send(res);
           } else {
             fastify.log.info(error);
           }
@@ -223,10 +223,10 @@ async function couchdb(fastify, options, next) {
     }
   });
 
-  fastify.decorate('getSeriesMetadata', async (request, reply) => {
+  fastify.decorate('getSeriesMetadata', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
-      await dicomDB.view(
+      dicomDB.view(
         'instances',
         'wado_metadata',
         {
@@ -240,7 +240,7 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
-            reply.send(JSON.stringify(res));
+            reply.send(res);
           } else {
             fastify.log.info(error);
           }
@@ -251,10 +251,10 @@ async function couchdb(fastify, options, next) {
     }
   });
 
-  fastify.decorate('getInstanceMetadata', async (request, reply) => {
+  fastify.decorate('getInstanceMetadata', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
-      await dicomDB.view(
+      dicomDB.view(
         'instances',
         'wado_metadata',
         {
@@ -267,7 +267,7 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
-            reply.send(JSON.stringify(res));
+            reply.send(res);
           } else {
             fastify.log.info(error);
           }
