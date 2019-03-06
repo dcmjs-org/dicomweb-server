@@ -5,16 +5,6 @@ chai.use(chaiHttp);
 const { expect } = chai;
 
 describe('QIDO Tests', () => {
-  //   let server;
-  //   before(async () => {
-  //     process.env.host = '0.0.0.0';
-  //     process.env.port = 5987;
-  //     server = require('../server'); // eslint-disable-line
-  //     await server.ready();
-  //   });
-  //   after(() => {
-  //     server.close();
-  //   });
   it('it should GET all studies', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
