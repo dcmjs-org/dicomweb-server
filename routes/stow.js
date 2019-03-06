@@ -2,7 +2,7 @@
 async function stowRoutes(fastify) {
   fastify.route({
     method: 'POST',
-    url: '/studies/:study',
+    url: '/studies',
     schema: {
       params: {
         type: 'object',

@@ -42,7 +42,7 @@ fastify.after(() => {
   // this should be done after CouchDB plugin to be able to use the accessor methods
   fastify.register(require('./routes/qido')); // eslint-disable-line global-require
   fastify.register(require('./routes/wado')); // eslint-disable-line global-require
-  // fastify.register(require('./routes/stow'));
+  fastify.register(require('./routes/stow')); // eslint-disable-line global-require
   fastify.register(require('./routes/other')); // eslint-disable-line global-require
 
   fastify.route({

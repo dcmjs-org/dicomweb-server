@@ -1,10 +1,11 @@
+/* eslint-disable no-underscore-dangle */
 const fp = require('fastify-plugin');
+const toArrayBuffer = require('to-array-buffer');
 const config = require('../config/index');
 
-// const toArrayBuffer = require('to-array-buffer');
-// const dicomwebClient = require('dicomweb-client');
-// window = {};
-// const dcmjs = require('dcmjs');
+// eslint-disable-next-line no-global-assign
+window = {};
+const dcmjs = require('../../dcmjs/build/dcmjs');
 
 const viewsjs = require('../config/views');
 
@@ -18,35 +19,33 @@ async function couchdb(fastify, options, next) {
         // check if the db exists
         if (databases.indexOf(config.db) < 0) {
           await fastify.couch.db.create(config.db);
-          const dicomDB = fastify.couch.db.use(config.db);
-          // define an empty design document
-          let viewDoc = {};
-          viewDoc.views = {};
-          // try and get the design document
-          try {
-            viewDoc = await dicomDB.get('_design/instances');
-          } catch (e) {
-            fastify.log.info('View document not found! Creating new one');
-          }
-          const keys = Object.keys(viewsjs.views);
-          const values = Object.values(viewsjs.views);
-          // update the views
-          for (let i = 0; i < keys.length; i += 1) {
-            viewDoc.views[keys[i]] = values[i];
-          }
-          // insert the updated/created design document
-          await dicomDB.insert(viewDoc, '_design/instances', insertErr => {
-            if (insertErr) {
-              fastify.log.info(`Error updating the design document ${insertErr.message}`);
-              reject();
-            } else {
-              fastify.log.info('Design document updated successfully ');
-              resolve();
-            }
-          });
-        } else {
-          resolve();
         }
+        const dicomDB = fastify.couch.db.use(config.db);
+        // define an empty design document
+        let viewDoc = {};
+        viewDoc.views = {};
+        // try and get the design document
+        try {
+          viewDoc = await dicomDB.get('_design/instances');
+        } catch (e) {
+          fastify.log.info('View document not found! Creating new one');
+        }
+        const keys = Object.keys(viewsjs.views);
+        const values = Object.values(viewsjs.views);
+        // update the views
+        for (let i = 0; i < keys.length; i += 1) {
+          viewDoc.views[keys[i]] = values[i];
+        }
+        // insert the updated/created design document
+        await dicomDB.insert(viewDoc, '_design/instances', insertErr => {
+          if (insertErr) {
+            fastify.log.info(`Error updating the design document ${insertErr.message}`);
+            reject();
+          } else {
+            fastify.log.info('Design document updated successfully ');
+            resolve();
+          }
+        });
       })
   );
 
@@ -106,13 +105,15 @@ async function couchdb(fastify, options, next) {
             studySeriesObj['00201206'].Value.push(values[0][study.key[0]]);
             res.push(studySeriesObj);
           });
-          reply.send(res);
+          reply.code(200).send(res);
         })
         .catch(err => {
-          reply.send(err);
+          // TODO send correct error codes
+          // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+          reply.code(503).send(err);
         });
     } catch (err) {
-      reply.send(err);
+      reply.code(503).send(err);
     }
   });
 
@@ -142,14 +143,17 @@ async function couchdb(fastify, options, next) {
               seriesObj['00201209'].Value.push(series.value);
               res.push(seriesObj);
             });
-            reply.send(res);
+            reply.code(200).send(res);
           } else {
             fastify.log.info(error);
+            // TODO send correct error codes
+            // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+            reply.code(503).send(error);
           }
         }
       );
     } catch (err) {
-      reply.send(err);
+      reply.code(503).send(err);
     }
   });
 
@@ -174,14 +178,17 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.key[3]);
             });
-            reply.send(res);
+            reply.code(200).send(res);
           } else {
             fastify.log.info(error);
+            // TODO send correct error codes
+            // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+            reply.code(503).send(error);
           }
         }
       );
     } catch (err) {
-      reply.send(err);
+      reply.code(503).send(err);
     }
   });
 
@@ -189,9 +196,9 @@ async function couchdb(fastify, options, next) {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
       reply.header('Content-Disposition', `attachment; filename=${request.params.instance}.dcm`);
-      reply.send(dicomDB.attachment.getAsStream(request.params.instance, 'object.dcm'));
+      reply.code(200).send(dicomDB.attachment.getAsStream(request.params.instance, 'object.dcm'));
     } catch (err) {
-      reply.send(err);
+      reply.code(404).send(err);
     }
   });
 
@@ -212,14 +219,15 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
-            reply.send(res);
+            reply.code(200).send(res);
           } else {
             fastify.log.info(error);
+            reply.code(404).send(error);
           }
         }
       );
     } catch (err) {
-      reply.send(err);
+      reply.code(404).send(err);
     }
   });
 
@@ -240,14 +248,15 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
-            reply.send(res);
+            reply.code(200).send(res);
           } else {
             fastify.log.info(error);
+            reply.code(404).send(error);
           }
         }
       );
     } catch (err) {
-      reply.send(err);
+      reply.code(404).send(err);
     }
   });
 
@@ -267,14 +276,15 @@ async function couchdb(fastify, options, next) {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
-            reply.send(res);
+            reply.code(200).send(res);
           } else {
             fastify.log.info(error);
+            reply.code(404).send(error);
           }
         }
       );
     } catch (err) {
-      reply.send(err);
+      reply.code(404).send(err);
     }
   });
 
@@ -299,38 +309,46 @@ async function couchdb(fastify, options, next) {
             reply.code(200).send(res);
           } else {
             fastify.log.info(error);
-            reply.code(500).send(error);
+            reply.code(503).send(error);
           }
         }
       );
     } catch (err) {
-      reply.code(500).send(err);
+      reply.code(503).send(err);
     }
   });
 
-  // fastify.decorate('stow', async (request, reply) => {
-  //   // dicomwc=new dicomweb_client.api.DICOMwebClient({"url" : "noURL"});
-  //   const res = fastify.dicomweb_client.message.multipartDecode(request.body);
-  //   const ab = toArrayBuffer(res);
-  //   const dicomAttach = {
-  //     name: 'object.dcm',
-  //     data: ab,
-  //     content_type: '',
-  //   };
+  fastify.decorate('stow', (request, reply) => {
+    const res = toArrayBuffer(request.body);
+    const parts = dcmjs.utilities.message.multipartDecode(res);
+    const promises = [];
+    for (let i = 0; i < parts.length; i += 1) {
+      const arrayBuffer = parts[i];
+      const dicomAttach = {
+        name: 'object.dcm',
+        data: arrayBuffer,
+        content_type: '',
+      };
 
-  //   const dictDataset = DICOMZero.dictAndDatasetFromArrayBuffer(ab);
-  //   // console.log(dataset)
-  //   const couchDoc = {
-  //     _id: dictDataset.dataset.SOPInstanceUID,
-  //     dataset: dictDataset.dict,
-  //   };
-  //   const dicomDB = fastify.couch.db.use(config.db);
-  //   dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id, (err, body) => {
-  //     console.log(err);
-  //     if (!err) console.log(body);
-  //   });
-  //   reply.send('success');
-  // });
+      const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
+      const couchDoc = {
+        _id: dicomData.dict['00080018'].Value[0],
+        dataset: dicomData.dict,
+      };
+      const dicomDB = fastify.couch.db.use(config.db);
+      promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
+    }
+    Promise.all(promises)
+      .then(() => {
+        reply.code(200).send('success');
+      })
+      .catch(err => {
+        // TODO Proper error reporting implementation required
+        // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+        fastify.log.info(`Error in STOW: ${err}`);
+        reply.code(503).send('error');
+      });
+  });
 
   fastify.log.info(`Using db: ${config.db}`);
   // register couchdb

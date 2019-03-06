@@ -5,8 +5,6 @@
   "main": "server.js",
   "dependencies": {
     "chai-http": "^4.2.1",
-    "dcmjs": "^0.3.1-build-26",
-    "dicomweb-client": "^0.4.1",
     "fastify": "^1.13.4",
     "fastify-basic-auth": "^0.3.1",
     "fastify-couchdb": "^0.2.0",
