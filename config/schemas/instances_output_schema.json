@@ -1,7 +1,7 @@
 {
   "$id": "instances_schema",
   "type": "array",
-  "items": [
+  "items":
     {
       "type": "object",
       "properties": {
@@ -167,7 +167,7 @@
               "type": "array",
               "items": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 }
               ]
             }
@@ -249,5 +249,4 @@
         "00280100"
       ]
     }
-  ]
 }

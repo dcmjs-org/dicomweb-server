@@ -1,7 +1,7 @@
 {
   "$id": "series_schema",
   "type": "array",
-  "items": [
+  "items":
     {
       "type": "object",
       "properties": {
@@ -167,7 +167,7 @@
               "type": "array",
               "items": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 }
               ]
             }
@@ -198,7 +198,6 @@
       },
       "required": [
         "00080005",
-        "00080054",
         "00080056",
         "00080060",
         "0008103E",
@@ -209,5 +208,4 @@
         "00201209"
       ]
     }
-  ]
 }
