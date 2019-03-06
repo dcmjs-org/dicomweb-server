@@ -5,13 +5,11 @@ const fastify = require('fastify')({
 const config = require('./config/index');
 
 fastify.addContentTypeParser('*', (req, done) => {
-  // done()
   let data = [];
   req.on('data', chunk => {
     data.push(chunk);
   });
   req.on('end', () => {
-    // console.log(data)
     data = Buffer.concat(data);
     done(null, data);
   });
@@ -35,9 +33,6 @@ fastify.register(require('./plugins/CouchDB'), {
 });
 
 fastify.after(() => {
-  // this enables basic authentication
-  // disabling authentication for now
-  // fastify.addHook('preHandler', fastify.basicAuth)
   // register routes
   // this should be done after CouchDB plugin to be able to use the accessor methods
   fastify.register(require('./routes/qido')); // eslint-disable-line global-require
