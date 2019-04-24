@@ -4,12 +4,15 @@
   "description": "Lightweight DICOMweb Server with CouchDB",
   "main": "server.js",
   "dependencies": {
+    "atob": "^2.1.2",
     "chai-http": "^4.2.1",
     "fastify": "^2.0.0",
     "fastify-basic-auth": "^0.3.1",
+    "fastify-cors": "^2.1.2",
     "fastify-couchdb": "^0.2.0",
     "fastify-plugin": "^1.5.0",
     "fastify-static": "^1.1.0",
+    "keycloak-backend": "^2.0.0",
     "to-array-buffer": "^3.2.0",
     "xmlhttprequest": "^1.8.0"
   },
