@@ -88,6 +88,7 @@ const authCheck = async (authHeader, res) => {
       keycloak.accessToken.config.username = username;
       keycloak.accessToken.config.password = password;
       // see if we can authenticate
+      // keycloak supports oidc, this is a workaround to support basic authentication
       const accessToken = await keycloak.accessToken.get();
       if (!accessToken) {
         res.code(401).send({
