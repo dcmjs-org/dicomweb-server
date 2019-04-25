@@ -9,7 +9,7 @@ const dcmjs = require('../../dcmjs/build/dcmjs');
 
 const viewsjs = require('../config/views');
 
-async function couchdb(fastify, options, next) {
+async function couchdb(fastify, options) {
   // Update the views in couchdb with the ones defined in the code
   fastify.decorate(
     'checkAndCreateDb',
@@ -355,25 +355,27 @@ async function couchdb(fastify, options, next) {
     // eslint-disable-line global-require
     url: options.url,
   });
-  fastify.after(() => {
+  
+  fastify.after(async () => {
+    try {
+      await fastify.checkAndCreateDb();
+    } catch (err) {
+      fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
+      fastify.close();
+    }
     // need to add hook for close to remove the db if test;
-    fastify.addHook('onClose', (instance, done) => {
+    fastify.addHook('onClose', async (instance, done) => {
       if (config.env === 'test') {
-        // if it is test remove the database
-        instance.couch.db.destroy(config.db);
-        fastify.log.info('Destroying test database');
+        try {
+          // if it is test remove the database
+          await instance.couch.db.destroy(config.db);
+          fastify.log.info('Destroying test database');
+        } catch (err) {
+          fastify.log.info(`Cannot destroy test database (err:${err})`);
+        }
         done();
       }
     });
-    fastify
-      .checkAndCreateDb()
-      .then(() => {
-        next();
-      })
-      .catch(err => {
-        fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
-        fastify.close();
-      });
   });
 }
 // expose as plugin so the module using it can access the decorated methods
