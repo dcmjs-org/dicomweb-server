@@ -355,7 +355,6 @@ async function couchdb(fastify, options) {
     // eslint-disable-line global-require
     url: options.url,
   });
-  
   fastify.after(async () => {
     try {
       await fastify.checkAndCreateDb();
