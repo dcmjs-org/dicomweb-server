@@ -316,35 +316,42 @@ async function couchdb(fastify, options) {
   });
 
   fastify.decorate('stow', (request, reply) => {
-    const res = toArrayBuffer(request.body);
-    const parts = dcmjs.utilities.message.multipartDecode(res);
-    const promises = [];
-    for (let i = 0; i < parts.length; i += 1) {
-      const arrayBuffer = parts[i];
-      const dicomAttach = {
-        name: 'object.dcm',
-        data: arrayBuffer,
-        content_type: '',
-      };
+    try {
+      const res = toArrayBuffer(request.body);
+      const parts = dcmjs.utilities.message.multipartDecode(res);
+      const promises = [];
+      for (let i = 0; i < parts.length; i += 1) {
+        const arrayBuffer = parts[i];
+        const dicomAttach = {
+          name: 'object.dcm',
+          data: arrayBuffer,
+          content_type: '',
+        };
 
-      const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
-      const couchDoc = {
-        _id: dicomData.dict['00080018'].Value[0],
-        dataset: dicomData.dict,
-      };
-      const dicomDB = fastify.couch.db.use(config.db);
-      promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
+        const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
+        const couchDoc = {
+          _id: dicomData.dict['00080018'].Value[0],
+          dataset: dicomData.dict,
+        };
+        const dicomDB = fastify.couch.db.use(config.db);
+        promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
+      }
+      Promise.all(promises)
+        .then(() => {
+          reply.code(200).send('success');
+        })
+        .catch(err => {
+          // TODO Proper error reporting implementation required
+          // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+          fastify.log.info(`Error in STOW: ${err}`);
+          reply.code(503).send('error');
+        });
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      fastify.log.info(`Error in STOW: ${e}`);
+      reply.code(503).send('error');
     }
-    Promise.all(promises)
-      .then(() => {
-        reply.code(200).send('success');
-      })
-      .catch(err => {
-        // TODO Proper error reporting implementation required
-        // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-        fastify.log.info(`Error in STOW: ${err}`);
-        reply.code(503).send('error');
-      });
   });
 
   fastify.log.info(`Using db: ${config.db}`);
