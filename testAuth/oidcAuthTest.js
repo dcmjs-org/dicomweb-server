@@ -59,7 +59,7 @@ describe('OIDC Auth', () => {
   });
 
   // test successful auth finally as we are not revoking token for now
-  it('it should authenticate through keycloak to get the token (not API functionality)', done => {
+  it('it should authenticate through keycloak to get the token (not API functionality, for debugging purposes only)', done => {
     keycloak.accessToken.config.username = username;
     keycloak.accessToken.config.password = password;
     // see if we can authenticate

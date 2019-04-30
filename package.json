@@ -30,7 +30,9 @@
   "scripts": {
     "start": "node server.js",
     "pretest": "eslint --ignore-path .gitignore .",
-    "test": "NODE_ENV=test mocha --timeout 10000; NODE_ENV=test.auth.basic mocha testAuth/basicAuthTest.js --timeout 10000; NODE_ENV=test.auth.oidc mocha testAuth/oidcAuthTest.js --timeout 10000"
+    "test": "NODE_ENV=test mocha --timeout 10000",
+    "test_basic": "NODE_ENV=test.auth.basic mocha testAuth/basicAuthTest.js --timeout 10000",
+    "test_oidc": "NODE_ENV=test.auth.oidc mocha testAuth/oidcAuthTest.js --timeout 10000"
   },
   "keywords": [
     "DICOMweb",
