@@ -4,4 +4,5 @@ module.exports = {
   db: 'testdb_dicomweb',
   dbPort: process.env.PORT || 5984,
   auth: 'none',
+  logger: false,
 };

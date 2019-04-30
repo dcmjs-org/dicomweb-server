@@ -4,4 +4,5 @@ module.exports = {
   db: 'chronicle',
   dbPort: process.env.PORT || 5984,
   auth: 'none',
+  logger: true,
 };

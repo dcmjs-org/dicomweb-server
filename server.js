@@ -1,13 +1,13 @@
+// eslint-disable-next-line import/order
+const config = require('./config/index');
 // Require the framework and instantiate it
 const fastify = require('fastify')({
-  logger: true,
+  logger: config.logger || false,
 });
 
 const atob = require('atob');
 
-const config = require('./config/index');
 // I need to import this after config as it uses config values
-// eslint-disable-next-line import/order
 const keycloak = require('keycloak-backend')({
   realm: config.authConfig.realm, // required for verify
   'auth-server-url': config.authConfig.authServerUrl, // required for verify
@@ -87,12 +87,18 @@ const authCheck = async (authHeader, res) => {
       // put the username and password in keycloak object
       keycloak.accessToken.config.username = username;
       keycloak.accessToken.config.password = password;
-      // see if we can authenticate
-      // keycloak supports oidc, this is a workaround to support basic authentication
-      const accessToken = await keycloak.accessToken.get();
-      if (!accessToken) {
+      try {
+        // see if we can authenticate
+        // keycloak supports oidc, this is a workaround to support basic authentication
+        const accessToken = await keycloak.accessToken.get();
+        if (!accessToken) {
+          res.code(401).send({
+            message: 'Authentication unsuccessful',
+          });
+        }
+      } catch (err) {
         res.code(401).send({
-          message: 'Authentication unsuccessful',
+          message: `Authentication error ${err.message}`,
         });
       }
     }
