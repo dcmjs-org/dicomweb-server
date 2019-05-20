@@ -1,7 +1,7 @@
 {
     "$id": "patients_schema",
     "type": "array",
-    "items": [
+    "items": 
         {
         "type": "object",
         "properties": {
@@ -10,11 +10,10 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "string"
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -29,11 +28,10 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "string"
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -48,11 +46,10 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "string"
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -67,11 +64,10 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "string"
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -86,7 +82,7 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "object",
                     "properties": {
@@ -95,7 +91,6 @@
                         }
                     }
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -110,11 +105,10 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "string"
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -129,11 +123,10 @@
             "properties": {
                 "Value": {
                 "type": "array",
-                "items": [
+                "items": 
                     {
                     "type": "string"
                     }
-                ]
                 },
                 "vr": {
                 "type": "string"
@@ -145,5 +138,4 @@
             }
         }
         }
-    ]
 }
