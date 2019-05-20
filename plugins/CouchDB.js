@@ -9,43 +9,48 @@ const dcmjs = require('../../dcmjs/build/dcmjs');
 
 const viewsjs = require('../config/views');
 
-async function couchdb(fastify, options, next) {
+async function couchdb(fastify, options) {
   // Update the views in couchdb with the ones defined in the code
   fastify.decorate(
     'checkAndCreateDb',
     () =>
       new Promise(async (resolve, reject) => {
-        const databases = await fastify.couch.db.list();
-        // check if the db exists
-        if (databases.indexOf(config.db) < 0) {
-          await fastify.couch.db.create(config.db);
-        }
-        const dicomDB = fastify.couch.db.use(config.db);
-        // define an empty design document
-        let viewDoc = {};
-        viewDoc.views = {};
-        // try and get the design document
         try {
-          viewDoc = await dicomDB.get('_design/instances');
-        } catch (e) {
-          fastify.log.info('View document not found! Creating new one');
-        }
-        const keys = Object.keys(viewsjs.views);
-        const values = Object.values(viewsjs.views);
-        // update the views
-        for (let i = 0; i < keys.length; i += 1) {
-          viewDoc.views[keys[i]] = values[i];
-        }
-        // insert the updated/created design document
-        await dicomDB.insert(viewDoc, '_design/instances', insertErr => {
-          if (insertErr) {
-            fastify.log.info(`Error updating the design document ${insertErr.message}`);
-            reject();
-          } else {
-            fastify.log.info('Design document updated successfully ');
-            resolve();
+          const databases = await fastify.couch.db.list();
+          // check if the db exists
+          if (databases.indexOf(config.db) < 0) {
+            await fastify.couch.db.create(config.db);
           }
-        });
+          const dicomDB = fastify.couch.db.use(config.db);
+          // define an empty design document
+          let viewDoc = {};
+          viewDoc.views = {};
+          // try and get the design document
+          try {
+            viewDoc = await dicomDB.get('_design/instances');
+          } catch (e) {
+            fastify.log.info('View document not found! Creating new one');
+          }
+          const keys = Object.keys(viewsjs.views);
+          const values = Object.values(viewsjs.views);
+          // update the views
+          for (let i = 0; i < keys.length; i += 1) {
+            viewDoc.views[keys[i]] = values[i];
+          }
+          // insert the updated/created design document
+          await dicomDB.insert(viewDoc, '_design/instances', insertErr => {
+            if (insertErr) {
+              fastify.log.info(`Error updating the design document ${insertErr.message}`);
+              reject(insertErr);
+            } else {
+              fastify.log.info('Design document updated successfully ');
+              resolve();
+            }
+          });
+        } catch (err) {
+          fastify.log.info(`Error connecting to couchdb: ${err.message}`);
+          reject(err);
+        }
       })
   );
 
@@ -119,8 +124,6 @@ async function couchdb(fastify, options, next) {
 
   fastify.decorate('getQIDOSeries', (request, reply) => {
     try {
-      fastify.log.info(request.params.study);
-
       const dicomDB = fastify.couch.db.use(config.db);
       dicomDB.view(
         'instances',
@@ -133,8 +136,6 @@ async function couchdb(fastify, options, next) {
         },
         (error, body) => {
           if (!error) {
-            fastify.log.info(body);
-
             const res = [];
             body.rows.forEach(series => {
               // get the actual instance object (tags only)
@@ -159,8 +160,6 @@ async function couchdb(fastify, options, next) {
 
   fastify.decorate('getQIDOInstances', (request, reply) => {
     try {
-      fastify.log.info(request.params.study);
-
       const dicomDB = fastify.couch.db.use(config.db);
       dicomDB.view(
         'instances',
@@ -300,8 +299,6 @@ async function couchdb(fastify, options, next) {
         },
         (error, body) => {
           if (!error) {
-            fastify.log.info(body);
-
             const res = [];
             body.rows.forEach(patient => {
               res.push(patient.key);
@@ -319,35 +316,42 @@ async function couchdb(fastify, options, next) {
   });
 
   fastify.decorate('stow', (request, reply) => {
-    const res = toArrayBuffer(request.body);
-    const parts = dcmjs.utilities.message.multipartDecode(res);
-    const promises = [];
-    for (let i = 0; i < parts.length; i += 1) {
-      const arrayBuffer = parts[i];
-      const dicomAttach = {
-        name: 'object.dcm',
-        data: arrayBuffer,
-        content_type: '',
-      };
+    try {
+      const res = toArrayBuffer(request.body);
+      const parts = dcmjs.utilities.message.multipartDecode(res);
+      const promises = [];
+      for (let i = 0; i < parts.length; i += 1) {
+        const arrayBuffer = parts[i];
+        const dicomAttach = {
+          name: 'object.dcm',
+          data: arrayBuffer,
+          content_type: '',
+        };
 
-      const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
-      const couchDoc = {
-        _id: dicomData.dict['00080018'].Value[0],
-        dataset: dicomData.dict,
-      };
-      const dicomDB = fastify.couch.db.use(config.db);
-      promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
+        const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
+        const couchDoc = {
+          _id: dicomData.dict['00080018'].Value[0],
+          dataset: dicomData.dict,
+        };
+        const dicomDB = fastify.couch.db.use(config.db);
+        promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
+      }
+      Promise.all(promises)
+        .then(() => {
+          reply.code(200).send('success');
+        })
+        .catch(err => {
+          // TODO Proper error reporting implementation required
+          // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+          fastify.log.info(`Error in STOW: ${err}`);
+          reply.code(503).send('error');
+        });
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      fastify.log.info(`Error in STOW: ${e}`);
+      reply.code(503).send('error');
     }
-    Promise.all(promises)
-      .then(() => {
-        reply.code(200).send('success');
-      })
-      .catch(err => {
-        // TODO Proper error reporting implementation required
-        // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-        fastify.log.info(`Error in STOW: ${err}`);
-        reply.code(503).send('error');
-      });
   });
 
   fastify.log.info(`Using db: ${config.db}`);
@@ -359,17 +363,25 @@ async function couchdb(fastify, options, next) {
     url: options.url,
   });
   fastify.after(async () => {
-    await fastify.checkAndCreateDb();
+    try {
+      await fastify.checkAndCreateDb();
+    } catch (err) {
+      fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
+      fastify.close();
+    }
     // need to add hook for close to remove the db if test;
-    fastify.addHook('onClose', (instance, done) => {
+    fastify.addHook('onClose', async (instance, done) => {
       if (config.env === 'test') {
-        // if it is test remove the database
-        instance.couch.db.destroy(config.db);
-        fastify.log.info('Destroying test database');
+        try {
+          // if it is test remove the database
+          await instance.couch.db.destroy(config.db);
+          fastify.log.info('Destroying test database');
+        } catch (err) {
+          fastify.log.info(`Cannot destroy test database (err:${err})`);
+        }
         done();
       }
     });
-    next();
   });
 }
 // expose as plugin so the module using it can access the decorated methods

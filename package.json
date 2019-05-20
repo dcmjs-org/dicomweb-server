@@ -4,17 +4,20 @@
   "description": "Lightweight DICOMweb Server with CouchDB",
   "main": "server.js",
   "dependencies": {
+    "atob": "^2.1.2",
+    "chai": "^4.2.0",
     "chai-http": "^4.2.1",
     "fastify": "^2.0.0",
     "fastify-basic-auth": "^0.3.1",
+    "fastify-cors": "^2.1.2",
     "fastify-couchdb": "^0.2.0",
     "fastify-plugin": "^1.5.0",
     "fastify-static": "^1.1.0",
+    "keycloak-backend": "^2.0.0",
     "to-array-buffer": "^3.2.0",
     "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {
-    "chai": "^4.2.0",
     "eslint": "^5.14.1",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-config-prettier": "^4.1.0",
@@ -27,7 +30,9 @@
   "scripts": {
     "start": "node server.js",
     "pretest": "eslint --ignore-path .gitignore .",
-    "test": "NODE_ENV=test mocha --timeout 10000"
+    "test": "NODE_ENV=test mocha --timeout 10000",
+    "test_basic": "NODE_ENV=test.auth.basic mocha testAuth/basicAuthTest.js --timeout 10000",
+    "test_oidc": "NODE_ENV=test.auth.oidc mocha testAuth/oidcAuthTest.js --timeout 10000"
   },
   "keywords": [
     "DICOMweb",

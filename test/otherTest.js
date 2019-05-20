@@ -1,31 +1,37 @@
+require('./stowTest');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 
 chai.use(chaiHttp);
 const { expect } = chai;
 
-// as these are outside any describe, they are global to all tests!
-let server;
-before(async () => {
-  process.env.host = '0.0.0.0';
-  process.env.port = 5987;
-  server = require('../server'); // eslint-disable-line
-  await server.ready();
-});
-after(() => {
-  server.close();
-});
-
 describe('Patients API', () => {
-  it('it should GET all patients', done => {
+  it('it should GET all patients (one patient from stowed data)', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
-      .end((err, res) => {
+      .then(res => {
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
-        expect(res.body.length).to.be.eql(0);
+        expect(res.body.length).to.be.eql(1);
         done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('returned patient should be MRI-DIR-T2_3', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get('/patients')
+      .then(res => {
+        expect(res.statusCode).to.equal(200);
+        expect(res.body[0]['00100010'].Value[0].Alphabetic).to.be.eql('MRI-DIR-T2_3');
+        done();
+      })
+      .catch(e => {
+        done(e);
       });
   });
 });
