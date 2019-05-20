@@ -1,12 +1,10 @@
 /* eslint-disable no-underscore-dangle */
 const fp = require('fastify-plugin');
 const toArrayBuffer = require('to-array-buffer');
-const config = require('../config/index');
-
 // eslint-disable-next-line no-global-assign
 window = {};
-const dcmjs = require('../../dcmjs/build/dcmjs');
-
+const dcmjs = require('dcmjs');
+const config = require('../config/index');
 const viewsjs = require('../config/views');
 
 async function couchdb(fastify, options) {
@@ -59,21 +57,25 @@ async function couchdb(fastify, options) {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
 
-      const bodySeriesCounts = new Promise((resolve, reject) => {
+      const bodySeriesInfo = new Promise((resolve, reject) => {
         dicomDB.view(
           'instances',
           'qido_study_series',
           {
             reduce: true,
-            group_level: 1,
+            group_level: 2,
           },
           (error, body) => {
             if (!error) {
               const seriesCounts = {};
+              const seriesModalities = {};
               body.rows.forEach(study => {
-                seriesCounts[study.key[0]] = study.value;
+                if (!(study.key[0] in seriesCounts)) seriesCounts[study.key[0]] = 0;
+                seriesCounts[study.key[0]] += study.value;
+                if (!(study.key[0] in seriesModalities)) seriesModalities[study.key[0]] = [];
+                seriesModalities[study.key[0]].push(study.key[1]);
               });
-              resolve(seriesCounts);
+              resolve({ count: seriesCounts, modalities: seriesModalities });
             } else {
               reject(error);
             }
@@ -99,15 +101,19 @@ async function couchdb(fastify, options) {
         );
       });
 
-      Promise.all([bodySeriesCounts, bodyStudies])
+      Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
           const res = [];
           values[1].rows.forEach(study => {
             const studySeriesObj = study.key[1];
+            // add numberOfStudyRelatedInstances
             studySeriesObj['00201208'].Value = [];
             studySeriesObj['00201208'].Value.push(study.value);
+            // add numberOfStudyRelatedSeries
             studySeriesObj['00201206'].Value = [];
-            studySeriesObj['00201206'].Value.push(values[0][study.key[0]]);
+            studySeriesObj['00201206'].Value.push(values[0].count[study.key[0]]);
+            // add modalities
+            studySeriesObj['00080061'].Value = values[0].modalities[study.key[0]];
             res.push(studySeriesObj);
           });
           reply.code(200).send(res);
