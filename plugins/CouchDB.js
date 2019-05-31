@@ -340,7 +340,27 @@ async function couchdb(fastify, options) {
           dataset: dicomData.dict,
         };
         const dicomDB = fastify.couch.db.use(config.db);
-        promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
+        promises.push(
+          new Promise((resolve, reject) =>
+            dicomDB.get(couchDoc._id, (error, existing) => {
+              if (!error) {
+                couchDoc._rev = existing._rev;
+                fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+              }
+
+              dicomDB.multipart
+                .insert(couchDoc, [dicomAttach], couchDoc._id)
+                .then(() => {
+                  resolve('Saving successful');
+                })
+                .catch(err => {
+                  // TODO Proper error reporting implementation required
+                  reject(err);
+                });
+            })
+          )
+        );
+        // promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
       }
       Promise.all(promises)
         .then(() => {
@@ -356,6 +376,133 @@ async function couchdb(fastify, options) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
       fastify.log.info(`Error in STOW: ${e}`);
+      reply.code(503).send('error');
+    }
+  });
+
+  fastify.decorate('deleteStudy', (request, reply) => {
+    try {
+      const dicomDB = fastify.couch.db.use(config.db);
+      dicomDB.view(
+        'instances',
+        'qido_instances',
+        {
+          startkey: [request.params.study, '', ''],
+          endkey: [`${request.params.study}\u9999`, '{}', '{}'],
+          reduce: true,
+          group_level: 3,
+        },
+        (error, body) => {
+          if (!error) {
+            let count = 0;
+            const deletePromises = [];
+            body.rows.forEach(instance => {
+              deletePromises.push(
+                new Promise((resolve, reject) => {
+                  dicomDB.get(instance.key[2], (getError, existing) => {
+                    if (!getError) {
+                      dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
+                        if (deleteError) {
+                          fastify.log.info(`Error deleting document for dicom ${instance.key[2]}`);
+                          reject(deleteError);
+                        } else {
+                          fastify.log.info(`Deleted document for dicom ${instance.key[2]}`);
+                          count += 1;
+                          resolve();
+                        }
+                      });
+                    }
+                  });
+                })
+              );
+            });
+            Promise.all(deletePromises)
+              .then(() => {
+                console.log(`Deleted ${count} of ${body.rows.length}`);
+                if (count === body.rows.length) reply.code(200).send('Deleted successfully');
+                else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
+              })
+              .catch(err => {
+                // TODO send correct error codes
+                // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+                reply.code(503).send(err);
+              });
+          } else {
+            fastify.log.info(error);
+            // TODO send correct error codes
+            // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+            reply.code(503).send(error);
+          }
+        }
+      );
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      fastify.log.info(`Error in Delete: ${e}`);
+      reply.code(503).send('error');
+    }
+  });
+
+  fastify.decorate('deleteSeries', (request, reply) => {
+    try {
+      console.log(request.params.series);
+      const dicomDB = fastify.couch.db.use(config.db);
+      dicomDB.view(
+        'instances',
+        'qido_instances',
+        {
+          startkey: [request.params.study, request.params.series, ''],
+          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, '{}'],
+          reduce: true,
+          group_level: 3,
+        },
+        (error, body) => {
+          if (!error) {
+            let count = 0;
+            const deletePromises = [];
+            body.rows.forEach(instance => {
+              deletePromises.push(
+                new Promise((resolve, reject) => {
+                  dicomDB.get(instance.key[2], (getError, existing) => {
+                    if (!getError) {
+                      dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
+                        if (deleteError) {
+                          fastify.log.info(`Error deleting document for dicom ${instance.key[2]}`);
+                          reject(deleteError);
+                        } else {
+                          fastify.log.info(`Deleted document for dicom ${instance.key[2]}`);
+                          count += 1;
+                          resolve();
+                        }
+                      });
+                    }
+                  });
+                })
+              );
+            });
+            Promise.all(deletePromises)
+              .then(() => {
+                console.log(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                if (count === body.rows.length) reply.code(200).send('Deleted successfully');
+                else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
+              })
+              .catch(err => {
+                // TODO send correct error codes
+                // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+                reply.code(503).send(err);
+              });
+          } else {
+            fastify.log.info(error);
+            // TODO send correct error codes
+            // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+            reply.code(503).send(error);
+          }
+        }
+      );
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      fastify.log.info(`Error in Delete: ${e}`);
       reply.code(503).send('error');
     }
   });

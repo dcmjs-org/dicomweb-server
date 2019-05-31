@@ -12,6 +12,18 @@ async function routes(fastify) {
 
     handler: fastify.getPatients,
   });
+
+  fastify.route({
+    method: 'DELETE',
+    url: '/studies/:study/series/:series',
+    handler: fastify.deleteSeries,
+  });
+
+  fastify.route({
+    method: 'DELETE',
+    url: '/studies/:study',
+    handler: fastify.deleteStudy,
+  });
 }
 
 module.exports = routes;
