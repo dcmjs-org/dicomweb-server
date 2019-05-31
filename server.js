@@ -1,8 +1,19 @@
+const fs = require('fs-extra');
+const path = require('path');
 // eslint-disable-next-line import/order
 const config = require('./config/index');
 // Require the framework and instantiate it
 const fastify = require('fastify')({
   logger: config.logger || false,
+  https:
+    config.https === true &&
+    fs.existsSync(path.join(__dirname, 'tls.key')) &&
+    fs.existsSync(path.join(__dirname, 'tls.crt'))
+      ? {
+          key: fs.readFileSync(path.join(__dirname, 'tls.key')),
+          cert: fs.readFileSync(path.join(__dirname, 'tls.crt')),
+        }
+      : '',
 });
 
 const atob = require('atob');
@@ -50,10 +61,10 @@ fastify.register(require('./plugins/CouchDB'), {
 
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
-fastify.register(require('./routes/qido')); // eslint-disable-line global-require
-fastify.register(require('./routes/wado')); // eslint-disable-line global-require
-fastify.register(require('./routes/stow')); // eslint-disable-line global-require
-fastify.register(require('./routes/other')); // eslint-disable-line global-require
+fastify.register(require('./routes/qido'), { prefix: '/pacs' }); // eslint-disable-line global-require
+fastify.register(require('./routes/wado'), { prefix: '/pacs' }); // eslint-disable-line global-require
+fastify.register(require('./routes/stow'), { prefix: '/pacs' }); // eslint-disable-line global-require
+fastify.register(require('./routes/other'), { prefix: '/pacs' }); // eslint-disable-line global-require
 
 // authCheck routine checks if there is a bearer token or encoded basic authentication
 // info in the authorization header and does the authentication or verification of token
@@ -62,6 +73,7 @@ const authCheck = async (authHeader, res) => {
   if (authHeader.startsWith('Bearer ')) {
     // Extract the token
     const token = authHeader.slice(7, authHeader.length);
+    fastify.log.info(`Bearer token is ${token}`);
     if (token) {
       // verify token online
       try {
@@ -72,6 +84,7 @@ const authCheck = async (authHeader, res) => {
           });
         }
       } catch (e) {
+        console.log(e);
         res.code(401).send({
           message: e.message,
         });
@@ -127,7 +140,7 @@ fastify.decorate('auth', async (req, res) => {
 // add authentication prehandler, all requests need to be authenticated
 fastify.addHook('preHandler', fastify.auth);
 
-const port = process.env.port || '5985';
+const port = process.env.port || '8090';
 const host = process.env.host || '0.0.0.0';
 // Run the server!
 fastify.listen(port, host);
