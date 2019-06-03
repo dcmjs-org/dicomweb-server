@@ -207,6 +207,31 @@ async function couchdb(fastify, options) {
     }
   });
 
+  fastify.decorate('retrieveInstanceFrames', (request, reply) => {
+    // TODO:  this is just a non-working stuff for wado-rs frame retrieve
+    //
+    // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
+    //
+    // Issues:
+    // - Need to accept frames as a comma separated list of frame numbers (starting at 1)
+    //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
+    //   -- this means just skipping past the dicom header and returning just the PixelData.
+    // - in general, need to skip to the correct frame location for each requested frame
+    //   -- need to figure offsets out from the instance metadata (maybe precalculate?)
+    //   -- need to do a range request to get the part of the attachment corresponding to the frame
+    //        Couchdb attachments can be accessed via ranges:
+    //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
+    //        Not clear how to do this via nano.
+    //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
+    // - need to add the multipart header and content separators
+    try {
+      const dicomDB = fastify.couch.db.use(config.db);
+      reply.code(404).send("Not supported");
+    } catch (err) {
+      reply.code(404).send(err);
+    }
+  });
+
   fastify.decorate('getStudyMetadata', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
