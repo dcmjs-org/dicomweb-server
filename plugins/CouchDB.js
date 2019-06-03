@@ -200,8 +200,9 @@ async function couchdb(fastify, options) {
   fastify.decorate('retrieveInstance', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
-      reply.header('Content-Disposition', `attachment; filename=${request.params.instance}.dcm`);
-      reply.code(200).send(dicomDB.attachment.getAsStream(request.params.instance, 'object.dcm'));
+      const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
+      reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
+      reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
     } catch (err) {
       reply.code(404).send(err);
     }

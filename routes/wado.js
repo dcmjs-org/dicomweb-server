@@ -1,5 +1,37 @@
 // defines WADO routes
 async function wadoRoutes(fastify) {
+  // WADO URI Retrieve Instance
+  // GET {s}?{querystring}
+  fastify.route({
+    method: 'GET',
+    url: '/',
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          studyUID: {
+            type: 'string',
+          },
+          seriesUID: {
+            type: 'string',
+          },
+          objectUID: {
+            type: 'string',
+          },
+          contentType: {
+            type: 'string',
+          },
+          transferSyntax: {
+            type: 'string',
+          },
+        },
+        required: ['objectUID'],
+      },
+    },
+
+    handler: fastify.retrieveInstance,
+  });
+
   // WADO Retrieve Instance
   // GET {s}/studies/{study}/series/{series}/instances/{instance}
   fastify.route({

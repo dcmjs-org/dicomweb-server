@@ -56,3 +56,33 @@ Get study list:
 Store a DATA_DIRECTORY of DICOM image files (here with the ".IMA" extension).  Adjust the command line to match the location and naming of your files).
 
 `find DATA_DIRECTORY -iname \*.IMA -exec dicomweb_client --url http://localhost:5985 store instances \{\} \;`
+
+
+## Use with a viewer
+
+It's possible to use this server as a backend to the [OHIF Viewer](http://ohif.org) using a configuration like this.
+
+```
+     const dicomweb_serverConfig = {
+        routerBasename: "/ohif",
+        rootUrl: "http://localhost:2016/ohif",
+        servers: {
+          "dicomWeb": [
+            {
+              "name": "dicomweb_server",
+              "wadoUriRoot": "http://localhost:5985",
+              "qidoRoot": "http://localhost:5985",
+              "wadoRoot": "http://localhost:5985",
+              "qidoSupportsIncludeField": true,
+              "imageRendering": "wadouri",
+              "thumbnailRendering": "wadors",
+              "requestOptions": {
+                  "requestFromBrowser": true
+              }
+            },
+          ]
+        }
+      };
+```
+
+Note that currently the `imageRendering` option must be `wadouri`
