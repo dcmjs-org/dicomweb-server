@@ -226,8 +226,8 @@ async function couchdb(fastify, options) {
     //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
     // - need to add the multipart header and content separators
     try {
-      const dicomDB = fastify.couch.db.use(config.db);
-      reply.code(404).send("Not supported");
+      // const dicomDB = fastify.couch.db.use(config.db);
+      reply.code(404).send('Not supported');
     } catch (err) {
       reply.code(404).send(err);
     }
@@ -444,7 +444,7 @@ async function couchdb(fastify, options) {
             });
             Promise.all(deletePromises)
               .then(() => {
-                console.log(`Deleted ${count} of ${body.rows.length}`);
+                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
                 else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
               })
@@ -471,7 +471,6 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('deleteSeries', (request, reply) => {
     try {
-      console.log(request.params.series);
       const dicomDB = fastify.couch.db.use(config.db);
       dicomDB.view(
         'instances',
@@ -508,7 +507,7 @@ async function couchdb(fastify, options) {
             });
             Promise.all(deletePromises)
               .then(() => {
-                console.log(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                fastify.log.info(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
                 else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
               })
