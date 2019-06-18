@@ -172,8 +172,9 @@ async function couchdb(fastify, options) {
         'qido_instances',
         {
           startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, '{}'],
+          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
           reduce: true,
+          group: true,
           group_level: 4,
         },
         (error, body) => {
@@ -270,7 +271,7 @@ async function couchdb(fastify, options) {
         'wado_metadata',
         {
           startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, {}],
+          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, {}],
         },
         (error, body) => {
           if (!error) {
@@ -477,7 +478,7 @@ async function couchdb(fastify, options) {
         'qido_instances',
         {
           startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, '{}'],
+          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
           reduce: true,
           group_level: 3,
         },
