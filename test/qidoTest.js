@@ -112,6 +112,23 @@ describe('QIDO Tests', () => {
       });
   });
 
+  it('instances endpoint should return 1 instance for series 1.3.6.1.4.1.14519.5.2.1.1706.4996.125234324154032773868316308352', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.125234324154032773868316308352/instances'
+      )
+      .then(res => {
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
   it('instances endpoint should return no instance for madeup series 1.3.6.1.4.1.54747.5.2.1.1706.4996.4562342246724757457', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
