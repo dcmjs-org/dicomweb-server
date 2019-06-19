@@ -5,4 +5,5 @@ module.exports = {
   dbPort: process.env.PORT || 5984,
   auth: 'none',
   logger: true,
+  prefix: '/pacs',
 };

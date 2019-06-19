@@ -61,10 +61,10 @@ fastify.register(require('./plugins/CouchDB'), {
 
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
-fastify.register(require('./routes/qido'), { prefix: '/pacs' }); // eslint-disable-line global-require
-fastify.register(require('./routes/wado'), { prefix: '/pacs' }); // eslint-disable-line global-require
-fastify.register(require('./routes/stow'), { prefix: '/pacs' }); // eslint-disable-line global-require
-fastify.register(require('./routes/other'), { prefix: '/pacs' }); // eslint-disable-line global-require
+fastify.register(require('./routes/qido'), { prefix: config.prefix }); // eslint-disable-line global-require
+fastify.register(require('./routes/wado'), { prefix: config.prefix }); // eslint-disable-line global-require
+fastify.register(require('./routes/stow'), { prefix: config.prefix }); // eslint-disable-line global-require
+fastify.register(require('./routes/other'), { prefix: config.prefix }); // eslint-disable-line global-require
 
 // authCheck routine checks if there is a bearer token or encoded basic authentication
 // info in the authorization header and does the authentication or verification of token
