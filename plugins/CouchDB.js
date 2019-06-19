@@ -172,8 +172,9 @@ async function couchdb(fastify, options) {
         'qido_instances',
         {
           startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, '{}'],
+          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
           reduce: true,
+          group: true,
           group_level: 4,
         },
         (error, body) => {
@@ -200,8 +201,34 @@ async function couchdb(fastify, options) {
   fastify.decorate('retrieveInstance', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
-      reply.header('Content-Disposition', `attachment; filename=${request.params.instance}.dcm`);
-      reply.code(200).send(dicomDB.attachment.getAsStream(request.params.instance, 'object.dcm'));
+      const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
+      reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
+      reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+    } catch (err) {
+      reply.code(404).send(err);
+    }
+  });
+
+  fastify.decorate('retrieveInstanceFrames', (request, reply) => {
+    // TODO:  this is just a non-working stuff for wado-rs frame retrieve
+    //
+    // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
+    //
+    // Issues:
+    // - Need to accept frames as a comma separated list of frame numbers (starting at 1)
+    //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
+    //   -- this means just skipping past the dicom header and returning just the PixelData.
+    // - in general, need to skip to the correct frame location for each requested frame
+    //   -- need to figure offsets out from the instance metadata (maybe precalculate?)
+    //   -- need to do a range request to get the part of the attachment corresponding to the frame
+    //        Couchdb attachments can be accessed via ranges:
+    //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
+    //        Not clear how to do this via nano.
+    //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
+    // - need to add the multipart header and content separators
+    try {
+      // const dicomDB = fastify.couch.db.use(config.db);
+      reply.code(404).send('Not supported');
     } catch (err) {
       reply.code(404).send(err);
     }
@@ -244,7 +271,7 @@ async function couchdb(fastify, options) {
         'wado_metadata',
         {
           startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, {}],
+          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, {}],
         },
         (error, body) => {
           if (!error) {
@@ -418,7 +445,7 @@ async function couchdb(fastify, options) {
             });
             Promise.all(deletePromises)
               .then(() => {
-                console.log(`Deleted ${count} of ${body.rows.length}`);
+                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
                 else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
               })
@@ -445,14 +472,13 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('deleteSeries', (request, reply) => {
     try {
-      console.log(request.params.series);
       const dicomDB = fastify.couch.db.use(config.db);
       dicomDB.view(
         'instances',
         'qido_instances',
         {
           startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}\u9999`, `${request.params.series}\u9999`, '{}'],
+          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
           reduce: true,
           group_level: 3,
         },
@@ -482,7 +508,7 @@ async function couchdb(fastify, options) {
             });
             Promise.all(deletePromises)
               .then(() => {
-                console.log(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                fastify.log.info(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
                 else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
               })

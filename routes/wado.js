@@ -1,5 +1,37 @@
 // defines WADO routes
 async function wadoRoutes(fastify) {
+  // WADO URI Retrieve Instance
+  // GET {s}?{querystring}
+  fastify.route({
+    method: 'GET',
+    url: '/',
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          studyUID: {
+            type: 'string',
+          },
+          seriesUID: {
+            type: 'string',
+          },
+          objectUID: {
+            type: 'string',
+          },
+          contentType: {
+            type: 'string',
+          },
+          transferSyntax: {
+            type: 'string',
+          },
+        },
+        required: ['objectUID'],
+      },
+    },
+
+    handler: fastify.retrieveInstance,
+  });
+
   // WADO Retrieve Instance
   // GET {s}/studies/{study}/series/{series}/instances/{instance}
   fastify.route({
@@ -23,6 +55,34 @@ async function wadoRoutes(fastify) {
     },
 
     handler: fastify.retrieveInstance,
+  });
+
+  // WADO Retrieve Instance frame
+  // GET {s}/studies/{study}/series/{series}/instances/{instance}/frames/{frames}
+  fastify.route({
+    method: 'GET',
+    url: '/studies/:study/series/:series/instances/:instance/frames/:frames',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string',
+          },
+          series: {
+            type: 'string',
+          },
+          instance: {
+            type: 'string',
+          },
+          frames: {
+            type: 'string',
+          },
+        },
+      },
+    },
+
+    handler: fastify.retrieveInstanceFrames,
   });
 
   // WADO Retrieve Study Metadata
