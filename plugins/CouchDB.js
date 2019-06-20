@@ -11,6 +11,7 @@ async function couchdb(fastify, options) {
   fastify.decorate('init', async () => {
     try {
       await fastify.couch.db.list();
+      fastify.log.info('Connected to couchdb server');
       return fastify.checkAndCreateDb();
     } catch (err) {
       fastify.log.info('Waiting for couchdb server');
@@ -58,9 +59,7 @@ async function couchdb(fastify, options) {
           });
         } catch (err) {
           fastify.log.info(`Error connecting to couchdb: ${err.message}`);
-          // wait
-          await fastify.checkAndCreateDb();
-          // reject(err);
+          reject(err);
         }
       })
   );
