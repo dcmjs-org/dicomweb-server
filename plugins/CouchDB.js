@@ -447,7 +447,10 @@ async function couchdb(fastify, options) {
               .then(() => {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
+                else
+                  reply
+                    .code(503)
+                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
               })
               .catch(err => {
                 // TODO send correct error codes
@@ -508,9 +511,12 @@ async function couchdb(fastify, options) {
             });
             Promise.all(deletePromises)
               .then(() => {
-                fastify.log.info(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
+                else
+                  reply
+                    .code(503)
+                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
               })
               .catch(err => {
                 // TODO send correct error codes
