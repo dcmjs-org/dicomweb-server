@@ -4,6 +4,7 @@ const toArrayBuffer = require('to-array-buffer');
 // eslint-disable-next-line no-global-assign
 window = {};
 const dcmjs = require('dcmjs');
+const Axios = require('axios');
 const config = require('../config/index');
 const viewsjs = require('../config/views');
 
@@ -227,8 +228,94 @@ async function couchdb(fastify, options) {
     //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
     // - need to add the multipart header and content separators
     try {
-      // const dicomDB = fastify.couch.db.use(config.db);
-      reply.code(404).send('Not supported');
+      const instance = request.params.instance || request.query.objectUID;
+      this.request = Axios.create({
+        baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
+      });
+
+      // make a head query to get the attachment size
+      // TODO nano doesn't support db.attachment.head
+      this.request
+        .head(`/${instance}/object.dcm`)
+        .then(head => {
+          fastify.log.info(`Content length of the attachment is ${head.headers['content-length']}`);
+          const attachmentSize = Number(head.headers['content-length']);
+
+          // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+          const dicomDB = fastify.couch.db.use(config.db);
+          dicomDB.get(instance, (err, doc) => {
+            if (err) reply.code(503).send(err);
+            else {
+              try {
+                // get tags of the instance
+                const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
+                const numOfBits = doc.dataset['00280100'].Value[0];
+                const rows = doc.dataset['00280010'].Value[0];
+                const cols = doc.dataset['00280011'].Value[0];
+                const samplesForPixel = doc.dataset['00280002'].Value[0];
+                const numOfBytes = Math.ceil(numOfBits / 8);
+                const frameSize = rows * cols * numOfBytes * samplesForPixel;
+                // TODO Number should be removed after IS is corrected
+                const headerSize = attachmentSize - frameSize * Number(numOfFrames);
+                fastify.log.info(
+                  `numOfFrames: ${numOfFrames}, numOfBytes: ${numOfBytes}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
+                );
+
+                // get range from couch for each frame, just forward the url for now
+                // TODO update nano
+                const frames = [];
+                const framePromisses = [];
+                const frameNums = request.params.frames.split(',');
+                fastify.log.info(`frameNums that are sent : ${frameNums}`);
+                frameNums.forEach(frameNum => {
+                  const frameNo = Number(frameNum);
+                  const range = `bytes = ${headerSize +
+                    1 +
+                    frameSize * (frameNo - 1)}-${headerSize + frameSize * frameNo}`;
+                  fastify.log.info(
+                    `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
+                  );
+                  framePromisses.push(
+                    this.request.get(`/${instance}/object.dcm`, {
+                      Range: range,
+                      responseType: 'arraybuffer',
+                    })
+                  );
+                });
+                // pack the frames in a multipart and send
+                Promise.all(framePromisses)
+                  .then(frameResponses => {
+                    frameResponses.forEach(response => frames.push(response.data));
+                    const { data, boundary } = dcmjs.utilities.message.multipartEncode(
+                      frames,
+                      undefined,
+                      'application/octet-stream'
+                    );
+                    try {
+                      reply.headers({
+                        'Content-Type': `multipart/related; application/octet-stream; boundary=${boundary}`,
+                        maxContentLength: Buffer.byteLength(data) + 1,
+                      });
+                      reply.code(200).send(Buffer.from(data));
+                    } catch (replyErr) {
+                      fastify.log.info(`Error packing frames: ${replyErr.message}`);
+                      reply.code(503).send(replyErr.message);
+                    }
+                  })
+                  .catch(packErr => {
+                    reply.code(503).send(packErr.message);
+                  });
+              } catch (frameErr) {
+                fastify.log.info(`Not able to get frame, Error: ${frameErr.message}`);
+                reply.code(503).send(frameErr.message);
+              }
+            }
+          });
+        })
+        .catch(err => {
+          fastify.log.info(`Couldn't get content length for the attachment. Error: ${err.message}`);
+          reply.code(503).semd(err.message);
+        });
     } catch (err) {
       reply.code(404).send(err);
     }
