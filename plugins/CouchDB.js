@@ -8,6 +8,18 @@ const config = require('../config/index');
 const viewsjs = require('../config/views');
 
 async function couchdb(fastify, options) {
+  fastify.decorate('init', async () => {
+    try {
+      await fastify.couch.db.list();
+      fastify.log.info('Connected to couchdb server');
+      return fastify.checkAndCreateDb();
+    } catch (err) {
+      fastify.log.info('Waiting for couchdb server');
+      setTimeout(fastify.init, 3000);
+    }
+    return null;
+  });
+
   // Update the views in couchdb with the ones defined in the code
   fastify.decorate(
     'checkAndCreateDb',
@@ -549,7 +561,7 @@ async function couchdb(fastify, options) {
   });
   fastify.after(async () => {
     try {
-      await fastify.checkAndCreateDb();
+      await fastify.init();
     } catch (err) {
       fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
       fastify.close();
