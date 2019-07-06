@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 const fp = require('fastify-plugin');
+const _ = require('underscore');
 const toArrayBuffer = require('to-array-buffer');
 // eslint-disable-next-line no-global-assign
 window = {};
@@ -116,7 +117,9 @@ async function couchdb(fastify, options) {
       Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
           const res = [];
-          values[1].rows.forEach(study => {
+          // couch returns ordered list, merge if the study occurs multiple times consequently (due to seres listing different tags)
+          for (let i = 0; i < values[1].rows.length; i += 1) {
+            const study = values[1].rows[i];
             const studySeriesObj = study.key[1];
             // add numberOfStudyRelatedInstances
             studySeriesObj['00201208'].Value = [];
@@ -126,8 +129,30 @@ async function couchdb(fastify, options) {
             studySeriesObj['00201206'].Value.push(values[0].count[study.key[0]]);
             // add modalities
             studySeriesObj['00080061'].Value = values[0].modalities[study.key[0]];
+
+            // see if there are consequent records with the same studyuid
+            const currentStudyUID = study.key[0];
+            for (let j = i + 1; j < values[1].rows.length; j += 1) {
+              const consequentStudyUID = values[1].rows[j].key[0];
+              if (currentStudyUID === consequentStudyUID) {
+                // same study merge
+                const consequentStudySeriesObj = values[1].rows[j].key[1];
+                Object.keys(consequentStudySeriesObj).forEach(tag => {
+                  if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
+                    if (consequentStudySeriesObj[tag].Value)
+                      consequentStudySeriesObj[tag].Value.forEach(val => {
+                        if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [];
+                        if (!_.findIndex(studySeriesObj[tag].Value, val) === -1)
+                          studySeriesObj[tag].Value.push(val);
+                      });
+                  }
+                });
+                // skip the consequent study entries
+                i = j;
+              }
+            }
             res.push(studySeriesObj);
-          });
+          }
           reply.code(200).send(res);
         })
         .catch(err => {

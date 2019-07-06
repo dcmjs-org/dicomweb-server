@@ -16,6 +16,7 @@
     "fastify-static": "^1.1.0",
     "keycloak-backend": "^2.0.0",
     "to-array-buffer": "^3.2.0",
+    "underscore": "^1.9.1",
     "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {
