@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 const fp = require('fastify-plugin');
+const _ = require('underscore');
 const toArrayBuffer = require('to-array-buffer');
 // eslint-disable-next-line no-global-assign
 window = {};
@@ -8,6 +9,18 @@ const config = require('../config/index');
 const viewsjs = require('../config/views');
 
 async function couchdb(fastify, options) {
+  fastify.decorate('init', async () => {
+    try {
+      await fastify.couch.db.list();
+      fastify.log.info('Connected to couchdb server');
+      return fastify.checkAndCreateDb();
+    } catch (err) {
+      fastify.log.info('Waiting for couchdb server');
+      setTimeout(fastify.init, 3000);
+    }
+    return null;
+  });
+
   // Update the views in couchdb with the ones defined in the code
   fastify.decorate(
     'checkAndCreateDb',
@@ -104,7 +117,9 @@ async function couchdb(fastify, options) {
       Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
           const res = [];
-          values[1].rows.forEach(study => {
+          // couch returns ordered list, merge if the study occurs multiple times consequently (due to seres listing different tags)
+          for (let i = 0; i < values[1].rows.length; i += 1) {
+            const study = values[1].rows[i];
             const studySeriesObj = study.key[1];
             // add numberOfStudyRelatedInstances
             studySeriesObj['00201208'].Value = [];
@@ -114,8 +129,30 @@ async function couchdb(fastify, options) {
             studySeriesObj['00201206'].Value.push(values[0].count[study.key[0]]);
             // add modalities
             studySeriesObj['00080061'].Value = values[0].modalities[study.key[0]];
+
+            // see if there are consequent records with the same studyuid
+            const currentStudyUID = study.key[0];
+            for (let j = i + 1; j < values[1].rows.length; j += 1) {
+              const consequentStudyUID = values[1].rows[j].key[0];
+              if (currentStudyUID === consequentStudyUID) {
+                // same study merge
+                const consequentStudySeriesObj = values[1].rows[j].key[1];
+                Object.keys(consequentStudySeriesObj).forEach(tag => {
+                  if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
+                    if (consequentStudySeriesObj[tag].Value)
+                      consequentStudySeriesObj[tag].Value.forEach(val => {
+                        if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [];
+                        if (!_.findIndex(studySeriesObj[tag].Value, val) === -1)
+                          studySeriesObj[tag].Value.push(val);
+                      });
+                  }
+                });
+                // skip the consequent study entries
+                i = j;
+              }
+            }
             res.push(studySeriesObj);
-          });
+          }
           reply.code(200).send(res);
         })
         .catch(err => {
@@ -447,7 +484,10 @@ async function couchdb(fastify, options) {
               .then(() => {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
+                else
+                  reply
+                    .code(503)
+                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
               })
               .catch(err => {
                 // TODO send correct error codes
@@ -508,9 +548,12 @@ async function couchdb(fastify, options) {
             });
             Promise.all(deletePromises)
               .then(() => {
-                fastify.log.info(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows}`);
+                else
+                  reply
+                    .code(503)
+                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
               })
               .catch(err => {
                 // TODO send correct error codes
@@ -543,7 +586,7 @@ async function couchdb(fastify, options) {
   });
   fastify.after(async () => {
     try {
-      await fastify.checkAndCreateDb();
+      await fastify.init();
     } catch (err) {
       fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
       fastify.close();
