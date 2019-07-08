@@ -10,3 +10,16 @@ Details can found in https://na-mic.github.io/ProjectWeek/PW30_2019_GranCanaria/
 ## log in to container for testing/debugging
 
 `docker exec -it dicomweb /bin/bash`
+
+# Load an example data file
+
+```
+pip install dicomweb_client
+
+# get a sample file
+curl https://s3.amazonaws.com/IsomicsPublic/SampleData/MRHead/MRHead-multiframe.dcm --output MRHead-multiframe.dcm
+
+# store it
+dicomweb_client --url http://localhost:5985 store instances MRHead-multiframe.dcm
+
+```
