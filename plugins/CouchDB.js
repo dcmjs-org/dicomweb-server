@@ -269,15 +269,13 @@ async function couchdb(fastify, options) {
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
                 frameNums.forEach(frameNum => {
                   const frameNo = Number(frameNum);
-                  const range = `bytes = ${headerSize +
-                    1 +
-                    frameSize * (frameNo - 1)}-${headerSize + frameSize * frameNo}`;
+                  const range = `bytes=${headerSize + frameSize * (frameNo - 1)}-${headerSize - 1 + frameSize * frameNo}`;
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
                   framePromisses.push(
                     this.request.get(`/${instance}/object.dcm`, {
-                      Range: range,
+                      headers: { Range: range },
                       responseType: 'arraybuffer',
                     })
                   );
