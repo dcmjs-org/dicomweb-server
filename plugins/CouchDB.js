@@ -5,6 +5,8 @@ const toArrayBuffer = require('to-array-buffer');
 window = {};
 const dcmjs = require('dcmjs');
 const Axios = require('axios');
+const http = require('http');
+
 const config = require('../config/index');
 const viewsjs = require('../config/views');
 
@@ -269,21 +271,67 @@ async function couchdb(fastify, options) {
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
                 frameNums.forEach(frameNum => {
                   const frameNo = Number(frameNum);
-                  const range = `bytes=${headerSize + frameSize * (frameNo - 1)}-${headerSize - 1 + frameSize * frameNo}`;
+                  const range = `bytes=${headerSize + frameSize * (frameNo - 1)}-${headerSize -
+                    1 +
+                    frameSize * frameNo}`;
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
                   framePromisses.push(
-                    this.request.get(`/${instance}/object.dcm`, {
-                      headers: { Range: range },
-                      responseType: 'arraybuffer',
+                    new Promise((resolve, reject) => {
+                      const opt = {
+                        hostname: config.dbServer.replace('http://', ''),
+                        port: config.dbPort,
+                        path: `/${config.db}/${instance}/object.dcm`,
+                        method: 'GET',
+                        headers: { Range: range },
+                      };
+                      const data = [];
+
+                      const req = http.request(opt, res => {
+                        try {
+                          res.on('data', d => {
+                            data.push(d);
+                          });
+                          res.on('end', () => {
+                            const databuffer = Buffer.concat(data);
+                            resolve(databuffer);
+                          });
+                        } catch (e) {
+                          if (data.length === 0) reject(new Error('Empty buffer'));
+                          else {
+                            const databuffer = Buffer.concat(data);
+                            fastify.log.info(
+                              `Threw error in catch. Error: ${e.message}, sending buffer of size ${
+                                databuffer.length
+                              } anyway`
+                            );
+                            resolve(databuffer);
+                          }
+                        }
+                      });
+
+                      req.on('error', error => {
+                        if (data.length === 0) reject(new Error('Empty buffer'));
+                        else {
+                          const databuffer = Buffer.concat(data);
+                          fastify.log.info(
+                            `Threw error ${error.message}, sending buffer of size ${
+                              databuffer.length
+                            } anyway`
+                          );
+                          resolve(databuffer);
+                        }
+                      });
+
+                      req.end();
                     })
                   );
                 });
                 // pack the frames in a multipart and send
                 Promise.all(framePromisses)
                   .then(frameResponses => {
-                    frameResponses.forEach(response => frames.push(response.data));
+                    frameResponses.forEach(response => frames.push(response));
                     const { data, boundary } = dcmjs.utilities.message.multipartEncode(
                       frames,
                       undefined,
@@ -301,6 +349,7 @@ async function couchdb(fastify, options) {
                     }
                   })
                   .catch(packErr => {
+                    fastify.log.info(`pack error, Error: ${packErr.message}`);
                     reply.code(503).send(packErr.message);
                   });
               } catch (frameErr) {
