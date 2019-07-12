@@ -288,7 +288,12 @@ async function couchdb(fastify, options) {
                         headers: { Range: range },
                       };
                       const data = [];
-
+                      // node request is failing range requests with a parser error after reading the full content
+                      // curl and web browser xhr works (probably ignores the remaining) (couchdb has javascript tests for range query which are done with web browser xhr)
+                      // tried xmlhttprequest npm package but it uses node's request on nodejs side
+                      // also tried adding range query capability to nano, but it uses node's request package and throws the parser error
+                      // this code retrieves the range request using http.request and ignores if it encounters an error although it has buffer data
+                      // returns the retrieved buffer
                       const req = http.request(opt, res => {
                         try {
                           res.on('data', d => {
