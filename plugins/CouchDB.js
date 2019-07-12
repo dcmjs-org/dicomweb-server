@@ -231,6 +231,7 @@ async function couchdb(fastify, options) {
     // - need to add the multipart header and content separators
     try {
       const instance = request.params.instance || request.query.objectUID;
+      const framesParam = request.params.frames || request.query.frame;
       this.request = Axios.create({
         baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
       });
@@ -267,7 +268,7 @@ async function couchdb(fastify, options) {
                 // TODO update nano
                 const frames = [];
                 const framePromisses = [];
-                const frameNums = request.params.frames.split(',');
+                const frameNums = framesParam.split(',');
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
                 frameNums.forEach(frameNum => {
                   const frameNo = Number(frameNum);
