@@ -256,12 +256,11 @@ async function couchdb(fastify, options) {
                 const rows = doc.dataset['00280010'].Value[0];
                 const cols = doc.dataset['00280011'].Value[0];
                 const samplesForPixel = doc.dataset['00280002'].Value[0];
-                const numOfBytes = Math.ceil(numOfBits / 8);
-                const frameSize = rows * cols * numOfBytes * samplesForPixel;
+                const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
                 // TODO Number should be removed after IS is corrected
                 const headerSize = attachmentSize - frameSize * Number(numOfFrames);
                 fastify.log.info(
-                  `numOfFrames: ${numOfFrames}, numOfBytes: ${numOfBytes}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
+                  `numOfFrames: ${numOfFrames}, numOfBits: ${numOfBits}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
                 );
 
                 // get range from couch for each frame, just forward the url for now
