@@ -140,7 +140,7 @@ fastify.decorate('auth', async (req, res) => {
 // add authentication prehandler, all requests need to be authenticated
 fastify.addHook('preHandler', fastify.auth);
 
-const port = process.env.port || '8090';
+const port = process.env.port || '5985';
 const host = process.env.host || '0.0.0.0';
 // Run the server!
 fastify.listen(port, host);
