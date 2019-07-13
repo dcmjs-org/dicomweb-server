@@ -203,10 +203,14 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('retrieveInstance', (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use(config.db);
-      const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
-      reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
-      reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+      // if the query params have frame use retrieveInstanceFrames instead
+      if (request.query.frame) fastify.retrieveInstanceFrames(request, reply);
+      else {
+        const dicomDB = fastify.couch.db.use(config.db);
+        const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
+        reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
+        reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+      }
     } catch (err) {
       reply.code(404).send(err);
     }
