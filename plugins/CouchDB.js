@@ -5,6 +5,9 @@ const toArrayBuffer = require('to-array-buffer');
 // eslint-disable-next-line no-global-assign
 window = {};
 const dcmjs = require('dcmjs');
+const Axios = require('axios');
+const http = require('http');
+
 const config = require('../config/index');
 const viewsjs = require('../config/views');
 
@@ -237,10 +240,14 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('retrieveInstance', (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use(config.db);
-      const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
-      reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
-      reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+      // if the query params have frame use retrieveInstanceFrames instead
+      if (request.query.frame) fastify.retrieveInstanceFrames(request, reply);
+      else {
+        const dicomDB = fastify.couch.db.use(config.db);
+        const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
+        reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
+        reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+      }
     } catch (err) {
       reply.code(404).send(err);
     }
@@ -264,8 +271,144 @@ async function couchdb(fastify, options) {
     //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
     // - need to add the multipart header and content separators
     try {
-      // const dicomDB = fastify.couch.db.use(config.db);
-      reply.code(404).send('Not supported');
+      const instance = request.params.instance || request.query.objectUID;
+      const framesParam = request.params.frames || request.query.frame;
+      this.request = Axios.create({
+        baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
+      });
+
+      // make a head query to get the attachment size
+      // TODO nano doesn't support db.attachment.head
+      this.request
+        .head(`/${instance}/object.dcm`)
+        .then(head => {
+          fastify.log.info(`Content length of the attachment is ${head.headers['content-length']}`);
+          const attachmentSize = Number(head.headers['content-length']);
+
+          // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+          const dicomDB = fastify.couch.db.use(config.db);
+          dicomDB.get(instance, (err, doc) => {
+            if (err) reply.code(503).send(err);
+            else {
+              try {
+                // get tags of the instance
+                const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
+                const numOfBits = doc.dataset['00280100'].Value[0];
+                const rows = doc.dataset['00280010'].Value[0];
+                const cols = doc.dataset['00280011'].Value[0];
+                const samplesForPixel = doc.dataset['00280002'].Value[0];
+                const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
+                // TODO Number should be removed after IS is corrected
+                const headerSize = attachmentSize - frameSize * Number(numOfFrames);
+                fastify.log.info(
+                  `numOfFrames: ${numOfFrames}, numOfBits: ${numOfBits}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
+                );
+
+                // get range from couch for each frame, just forward the url for now
+                // TODO update nano
+                const frames = [];
+                const framePromisses = [];
+                const frameNums = framesParam.split(',');
+                fastify.log.info(`frameNums that are sent : ${frameNums}`);
+                frameNums.forEach(frameNum => {
+                  const frameNo = Number(frameNum);
+                  const range = `bytes=${headerSize + frameSize * (frameNo - 1)}-${headerSize -
+                    1 +
+                    frameSize * frameNo}`;
+                  fastify.log.info(
+                    `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
+                  );
+                  framePromisses.push(
+                    new Promise((resolve, reject) => {
+                      const opt = {
+                        hostname: config.dbServer.replace('http://', ''),
+                        port: config.dbPort,
+                        path: `/${config.db}/${instance}/object.dcm`,
+                        method: 'GET',
+                        headers: { Range: range },
+                      };
+                      const data = [];
+                      // node request is failing range requests with a parser error after reading the full content
+                      // curl and web browser xhr works (probably ignores the remaining) (couchdb has javascript tests for range query which are done with web browser xhr)
+                      // tried xmlhttprequest npm package but it uses node's request on nodejs side
+                      // also tried adding range query capability to nano, but it uses node's request package and throws the parser error
+                      // this code retrieves the range request using http.request and ignores if it encounters an error although it has buffer data
+                      // returns the retrieved buffer
+                      const req = http.request(opt, res => {
+                        try {
+                          res.on('data', d => {
+                            data.push(d);
+                          });
+                          res.on('end', () => {
+                            const databuffer = Buffer.concat(data);
+                            resolve(databuffer);
+                          });
+                        } catch (e) {
+                          if (data.length === 0) reject(new Error('Empty buffer'));
+                          else {
+                            const databuffer = Buffer.concat(data);
+                            fastify.log.info(
+                              `Threw error in catch. Error: ${e.message}, sending buffer of size ${
+                                databuffer.length
+                              } anyway`
+                            );
+                            resolve(databuffer);
+                          }
+                        }
+                      });
+
+                      req.on('error', error => {
+                        if (data.length === 0) reject(new Error('Empty buffer'));
+                        else {
+                          const databuffer = Buffer.concat(data);
+                          fastify.log.info(
+                            `Threw error ${error.message}, sending buffer of size ${
+                              databuffer.length
+                            } anyway`
+                          );
+                          resolve(databuffer);
+                        }
+                      });
+
+                      req.end();
+                    })
+                  );
+                });
+                // pack the frames in a multipart and send
+                Promise.all(framePromisses)
+                  .then(frameResponses => {
+                    frameResponses.forEach(response => frames.push(response));
+                    const { data, boundary } = dcmjs.utilities.message.multipartEncode(
+                      frames,
+                      undefined,
+                      'application/octet-stream'
+                    );
+                    try {
+                      reply.headers({
+                        'Content-Type': `multipart/related; application/octet-stream; boundary=${boundary}`,
+                        maxContentLength: Buffer.byteLength(data) + 1,
+                      });
+                      reply.code(200).send(Buffer.from(data));
+                    } catch (replyErr) {
+                      fastify.log.info(`Error packing frames: ${replyErr.message}`);
+                      reply.code(503).send(replyErr.message);
+                    }
+                  })
+                  .catch(packErr => {
+                    fastify.log.info(`pack error, Error: ${packErr.message}`);
+                    reply.code(503).send(packErr.message);
+                  });
+              } catch (frameErr) {
+                fastify.log.info(`Not able to get frame, Error: ${frameErr.message}`);
+                reply.code(503).send(frameErr.message);
+              }
+            }
+          });
+        })
+        .catch(err => {
+          fastify.log.info(`Couldn't get content length for the attachment. Error: ${err.message}`);
+          reply.code(503).semd(err.message);
+        });
     } catch (err) {
       reply.code(404).send(err);
     }

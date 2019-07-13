@@ -5,6 +5,7 @@
   "main": "server.js",
   "dependencies": {
     "atob": "^2.1.2",
+    "axios": "^0.19.0",
     "chai": "^4.2.0",
     "chai-http": "^4.3.0",
     "dcmjs": "^0.4.7",
@@ -14,7 +15,9 @@
     "fastify-couchdb": "^0.2.0",
     "fastify-plugin": "^1.6.0",
     "fastify-static": "^1.1.0",
+    "http": "0.0.0",
     "keycloak-backend": "^2.0.0",
+    "nano": "^8.1.0",
     "to-array-buffer": "^3.2.0",
     "underscore": "^1.9.1",
     "xmlhttprequest": "^1.8.0"
