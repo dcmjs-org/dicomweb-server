@@ -528,7 +528,7 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('stow', (request, reply) => {
+  fastify.decorate('stow', async (request, reply) => {
     try {
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
@@ -547,8 +547,10 @@ async function couchdb(fastify, options) {
           dataset: dicomData.dict,
         };
         const dicomDB = fastify.couch.db.use(config.db);
-        promises.push(
-          new Promise((resolve, reject) =>
+        // promises.push(
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(
+          (resolve, reject) =>
             dicomDB.get(couchDoc._id, (error, existing) => {
               if (!error) {
                 couchDoc._rev = existing._rev;
@@ -565,9 +567,8 @@ async function couchdb(fastify, options) {
                   reject(err);
                 });
             })
-          )
+          // )
         );
-        // promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
       }
       Promise.all(promises)
         .then(() => {
