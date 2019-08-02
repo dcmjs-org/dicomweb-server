@@ -24,6 +24,9 @@ async function wadoRoutes(fastify) {
           transferSyntax: {
             type: 'string',
           },
+          frame: {
+            type: 'string',
+          },
         },
         required: ['objectUID'],
       },

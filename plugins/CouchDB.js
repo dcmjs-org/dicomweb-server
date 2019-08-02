@@ -240,10 +240,14 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('retrieveInstance', (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use(config.db);
-      const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
-      reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
-      reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+      // if the query params have frame use retrieveInstanceFrames instead
+      if (request.query.frame) fastify.retrieveInstanceFrames(request, reply);
+      else {
+        const dicomDB = fastify.couch.db.use(config.db);
+        const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
+        reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
+        reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+      }
     } catch (err) {
       reply.code(404).send(err);
     }
@@ -293,12 +297,11 @@ async function couchdb(fastify, options) {
                 const rows = doc.dataset['00280010'].Value[0];
                 const cols = doc.dataset['00280011'].Value[0];
                 const samplesForPixel = doc.dataset['00280002'].Value[0];
-                const numOfBytes = Math.ceil(numOfBits / 8);
-                const frameSize = rows * cols * numOfBytes * samplesForPixel;
+                const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
                 // TODO Number should be removed after IS is corrected
                 const headerSize = attachmentSize - frameSize * Number(numOfFrames);
                 fastify.log.info(
-                  `numOfFrames: ${numOfFrames}, numOfBytes: ${numOfBytes}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
+                  `numOfFrames: ${numOfFrames}, numOfBits: ${numOfBits}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
                 );
 
                 // get range from couch for each frame, just forward the url for now
@@ -325,7 +328,12 @@ async function couchdb(fastify, options) {
                         headers: { Range: range },
                       };
                       const data = [];
-
+                      // node request is failing range requests with a parser error after reading the full content
+                      // curl and web browser xhr works (probably ignores the remaining) (couchdb has javascript tests for range query which are done with web browser xhr)
+                      // tried xmlhttprequest npm package but it uses node's request on nodejs side
+                      // also tried adding range query capability to nano, but it uses node's request package and throws the parser error
+                      // this code retrieves the range request using http.request and ignores if it encounters an error although it has buffer data
+                      // returns the retrieved buffer
                       const req = http.request(opt, res => {
                         try {
                           res.on('data', d => {
@@ -520,7 +528,7 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('stow', (request, reply) => {
+  fastify.decorate('stow', async (request, reply) => {
     try {
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
@@ -539,8 +547,10 @@ async function couchdb(fastify, options) {
           dataset: dicomData.dict,
         };
         const dicomDB = fastify.couch.db.use(config.db);
-        promises.push(
-          new Promise((resolve, reject) =>
+        // promises.push(
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(
+          (resolve, reject) =>
             dicomDB.get(couchDoc._id, (error, existing) => {
               if (!error) {
                 couchDoc._rev = existing._rev;
@@ -557,9 +567,8 @@ async function couchdb(fastify, options) {
                   reject(err);
                 });
             })
-          )
+          // )
         );
-        // promises.push(dicomDB.multipart.insert(couchDoc, [dicomAttach], couchDoc._id));
       }
       Promise.all(promises)
         .then(() => {
