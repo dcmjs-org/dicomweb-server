@@ -22,7 +22,7 @@ The value you put in should be the name of a json file in the config directory. 
 ## Installation
 
 ```
-git clone git://github.com:dcmjs-org/dicomweb-server
+git clone git://github.com/dcmjs-org/dicomweb-server
 
 cd dicomweb-server
 npm install
