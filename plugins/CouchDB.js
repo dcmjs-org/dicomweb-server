@@ -7,6 +7,7 @@ window = {};
 const dcmjs = require('dcmjs');
 const Axios = require('axios');
 const http = require('http');
+const fs = require('fs');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
@@ -528,47 +529,53 @@ async function couchdb(fastify, options) {
     }
   });
 
+  fastify.decorate('saveFile', filePath => {
+    const arrayBuffer = fs.readFileSync(filePath).buffer;
+    return fastify.saveBuffer(arrayBuffer);
+  });
+
+  fastify.decorate('saveBuffer', (arrayBuffer, dicomDB) => {
+    // eslint-disable-next-line no-param-reassign
+    if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
+    const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer);
+    const couchDoc = {
+      _id: dicomData.dict['00080018'].Value[0],
+      dataset: dicomData.dict,
+    };
+    const dicomAttach = {
+      name: 'object.dcm',
+      data: arrayBuffer,
+      content_type: '',
+    };
+    return new Promise((resolve, reject) =>
+      dicomDB.get(couchDoc._id, (error, existing) => {
+        if (!error) {
+          couchDoc._rev = existing._rev;
+          fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+        }
+
+        dicomDB.multipart
+          .insert(couchDoc, [dicomAttach], couchDoc._id)
+          .then(() => {
+            resolve('Saving successful');
+          })
+          .catch(err => {
+            // TODO Proper error reporting implementation required
+            reject(err);
+          });
+      })
+    );
+  });
   fastify.decorate('stow', async (request, reply) => {
     try {
+      const dicomDB = fastify.couch.db.use(config.db);
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
       const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
-        const dicomAttach = {
-          name: 'object.dcm',
-          data: arrayBuffer,
-          content_type: '',
-        };
-
-        const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
-        const couchDoc = {
-          _id: dicomData.dict['00080018'].Value[0],
-          dataset: dicomData.dict,
-        };
-        const dicomDB = fastify.couch.db.use(config.db);
-        // promises.push(
         // eslint-disable-next-line no-await-in-loop
-        await new Promise(
-          (resolve, reject) =>
-            dicomDB.get(couchDoc._id, (error, existing) => {
-              if (!error) {
-                couchDoc._rev = existing._rev;
-                fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
-              }
-
-              dicomDB.multipart
-                .insert(couchDoc, [dicomAttach], couchDoc._id)
-                .then(() => {
-                  resolve('Saving successful');
-                })
-                .catch(err => {
-                  // TODO Proper error reporting implementation required
-                  reject(err);
-                });
-            })
-          // )
-        );
+        await fastify.saveBuffer(arrayBuffer, dicomDB);
       }
       Promise.all(promises)
         .then(() => {

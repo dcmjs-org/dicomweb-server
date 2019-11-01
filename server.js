@@ -48,6 +48,13 @@ fastify.register(require('./plugins/CouchDB'), {
   url: `${config.dbServer}:${config.dbPort}`,
 });
 
+// register DIMSE plugin we created
+fastify.register(require('./plugins/DIMSE'), {
+  tempDir: config.DIMSETempDir,
+  aet: config.DIMSEAET,
+  port: config.DIMSEPort,
+});
+
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
 fastify.register(require('./routes/qido')); // eslint-disable-line global-require
