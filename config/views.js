@@ -1,13 +1,8 @@
+const wado = require('./wado.js');
+
 module.exports.views = {
   wado_metadata: {
-    map:
-      "function(doc){var key={};if(doc.dataset){studyUID='NA';if (doc.dataset['0020000D'].Value[0]) studyUID=doc.dataset['0020000D'].Value[0];" +
-      " seriesUID='NA'; if (doc.dataset['0020000E'].Value[0]) seriesUID=doc.dataset['0020000E'].Value[0];" +
-      " instanceUID='NA'; if (doc.dataset['00080018'].Value[0]) instanceUID=doc.dataset['00080018'].Value[0];" +
-      " for(var t in doc.dataset){var fallback='';if(doc.dataset[t]&&doc.dataset[t].Value&&doc.dataset[t].Value[0]){key[t]={};if(doc.dataset[t].Value[0]!==''){if(doc.dataset[t].vr==='PN')" +
-      " key[t].Value=[{'Alphabetic':doc.dataset[t].Value[0]||fallback}];else key[t].Value=[doc.dataset[t].Value[0]||fallback]}" +
-      ' key[t].vr=doc.dataset[t].vr}}' +
-      ' emit([studyUID,seriesUID,instanceUID],key);}}',
+    map: wado.toString()
   },
   patients: {
     map:
