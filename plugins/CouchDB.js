@@ -18,6 +18,7 @@ async function couchdb(fastify, options) {
       fastify.log.info('Connected to couchdb server');
       return fastify.checkAndCreateDb();
     } catch (err) {
+      console.log(`Couchdb connection error ${err.message}`);
       fastify.log.info('Waiting for couchdb server');
       setTimeout(fastify.init, 3000);
     }
