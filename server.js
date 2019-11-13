@@ -15,6 +15,8 @@ const keycloak = require('keycloak-backend')({
   client_secret: config.authConfig.clientSecret,
 });
 
+const { InternalError, ResourceNotFoundError } = require('./utils/Errors');
+
 fastify.addContentTypeParser('*', (req, done) => {
   let data = [];
   req.on('data', chunk => {
@@ -126,6 +128,12 @@ fastify.decorate('auth', async (req, res) => {
 
 // add authentication prehandler, all requests need to be authenticated
 fastify.addHook('preHandler', fastify.auth);
+fastify.addHook('onError', (request, reply, error, done) => {
+  if (error instanceof ResourceNotFoundError) reply.code(404);
+  else if (error instanceof InternalError) reply.code(500);
+  fastify.log.error(error.message);
+  done();
+});
 
 const port = process.env.port || '5985';
 const host = process.env.host || '0.0.0.0';

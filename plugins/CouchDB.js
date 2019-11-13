@@ -10,6 +10,7 @@ const http = require('http');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
+const { InternalError, ResourceNotFoundError } = require('../utils/Errors');
 
 async function couchdb(fastify, options) {
   fastify.decorate('init', async () => {
@@ -161,10 +162,10 @@ async function couchdb(fastify, options) {
         .catch(err => {
           // TODO send correct error codes
           // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-          reply.code(503).send(err);
+          reply.send(new InternalError('QIDO Studies retreival from couchdb', err));
         });
     } catch (err) {
-      reply.code(503).send(err);
+      reply.send(new InternalError('QIDO Studies retreival', err));
     }
   });
 
@@ -192,15 +193,14 @@ async function couchdb(fastify, options) {
             });
             reply.code(200).send(res);
           } else {
-            fastify.log.info(error);
             // TODO send correct error codes
             // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-            reply.code(503).send(error);
+            reply.send(new InternalError('QIDO series retreival from couchdb', error));
           }
         }
       );
     } catch (err) {
-      reply.code(503).send(err);
+      reply.send(new InternalError('QIDO series retreival', err));
     }
   });
 
@@ -226,15 +226,14 @@ async function couchdb(fastify, options) {
             });
             reply.code(200).send(res);
           } else {
-            fastify.log.info(error);
             // TODO send correct error codes
             // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-            reply.code(503).send(error);
+            reply.send(new InternalError('QIDO instances retreival from couchdb', error));
           }
         }
       );
     } catch (err) {
-      reply.code(503).send(err);
+      reply.send(new InternalError('QIDO instances retreival', err));
     }
   });
 
@@ -249,7 +248,13 @@ async function couchdb(fastify, options) {
         reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
       }
     } catch (err) {
-      reply.code(404).send(err);
+      reply.send(
+        new ResourceNotFoundError(
+          'Instance',
+          request.params.instance || request.query.objectUID,
+          err
+        )
+      );
     }
   });
 
@@ -288,7 +293,7 @@ async function couchdb(fastify, options) {
           // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
           const dicomDB = fastify.couch.db.use(config.db);
           dicomDB.get(instance, (err, doc) => {
-            if (err) reply.code(503).send(err);
+            if (err) reply.send(new InternalError('Get instance for frame retrieval', err));
             else {
               try {
                 // get tags of the instance
@@ -390,27 +395,25 @@ async function couchdb(fastify, options) {
                       });
                       reply.code(200).send(Buffer.from(data));
                     } catch (replyErr) {
-                      fastify.log.info(`Error packing frames: ${replyErr.message}`);
-                      reply.code(503).send(replyErr.message);
+                      reply.send(new InternalError('Packing frames', replyErr));
                     }
                   })
                   .catch(packErr => {
-                    fastify.log.info(`pack error, Error: ${packErr.message}`);
-                    reply.code(503).send(packErr.message);
+                    reply.send(new InternalError('Pack error', packErr));
                   });
               } catch (frameErr) {
-                fastify.log.info(`Not able to get frame, Error: ${frameErr.message}`);
-                reply.code(503).send(frameErr.message);
+                reply.send(new InternalError('Not able to get frame', frameErr));
               }
             }
           });
         })
         .catch(err => {
-          fastify.log.info(`Couldn't get content length for the attachment. Error: ${err.message}`);
-          reply.code(503).semd(err.message);
+          reply.send(new InternalError(`Couldn't get content length for the attachment`, err));
         });
     } catch (err) {
-      reply.code(404).send(err);
+      reply.send(
+        new ResourceNotFoundError('Frame', request.params.frames || request.query.frame, err)
+      );
     }
   });
 
@@ -433,13 +436,12 @@ async function couchdb(fastify, options) {
             });
             reply.code(200).send(res);
           } else {
-            fastify.log.info(error);
-            reply.code(404).send(error);
+            reply.send(new InternalError('Retrieve study metadata from couchdb', error));
           }
         }
       );
     } catch (err) {
-      reply.code(404).send(err);
+      reply.send(new InternalError('Retrieve study metadata', err));
     }
   });
 
@@ -462,13 +464,12 @@ async function couchdb(fastify, options) {
             });
             reply.code(200).send(res);
           } else {
-            fastify.log.info(error);
-            reply.code(404).send(error);
+            reply.send(new InternalError('Retrieve series metadata from couchdb', error));
           }
         }
       );
     } catch (err) {
-      reply.code(404).send(err);
+      reply.send(new InternalError('Retrieve study metadata', err));
     }
   });
 
@@ -490,13 +491,12 @@ async function couchdb(fastify, options) {
             });
             reply.code(200).send(res);
           } else {
-            fastify.log.info(error);
-            reply.code(404).send(error);
+            reply.send(new InternalError('Retrieve instance metadata from couchdb', error));
           }
         }
       );
     } catch (err) {
-      reply.code(404).send(err);
+      reply.send(new InternalError('Retrieve instance metadata from couchdb', err));
     }
   });
 
@@ -518,13 +518,12 @@ async function couchdb(fastify, options) {
             });
             reply.code(200).send(res);
           } else {
-            fastify.log.info(error);
-            reply.code(503).send(error);
+            reply.send(new InternalError('Retrieve patients from couchdb', error));
           }
         }
       );
     } catch (err) {
-      reply.code(503).send(err);
+      reply.send(new InternalError('Retrieve patients from couchdb', err));
     }
   });
 
@@ -532,7 +531,7 @@ async function couchdb(fastify, options) {
     try {
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
-      const promises = [];
+      // const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
         const dicomAttach = {
@@ -570,21 +569,22 @@ async function couchdb(fastify, options) {
           // )
         );
       }
-      Promise.all(promises)
-        .then(() => {
-          reply.code(200).send('success');
-        })
-        .catch(err => {
-          // TODO Proper error reporting implementation required
-          // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-          fastify.log.info(`Error in STOW: ${err}`);
-          reply.code(503).send('error');
-        });
+      reply.code(200).send('success');
+      // this part is not functional with await in the for loop above.
+      // TODO replace with promise queue
+      // Promise.all(promises)
+      //   .then(() => {
+      //     reply.code(200).send('success');
+      //   })
+      //   .catch(err => {
+      //     // TODO Proper error reporting implementation required
+      //     // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      //     reply.send(new InternalError('STOW', err));
+      //   });
     } catch (e) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-      fastify.log.info(`Error in STOW: ${e}`);
-      reply.code(503).send('error');
+      reply.send(new InternalError('STOW', e));
     }
   });
 
@@ -629,28 +629,31 @@ async function couchdb(fastify, options) {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
                 else
-                  reply
-                    .code(503)
-                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                  reply.send(
+                    new InternalError(
+                      'Delete not completed for study',
+                      new Error(
+                        `Instance counts don't match. Deleted ${count} of ${body.rows.length}`
+                      )
+                    )
+                  );
               })
               .catch(err => {
                 // TODO send correct error codes
                 // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-                reply.code(503).send(err);
+                reply.send(new InternalError('Delete instances of a study', err));
               });
           } else {
-            fastify.log.info(error);
             // TODO send correct error codes
             // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-            reply.code(503).send(error);
+            reply.send(new InternalError('Get instances of a study to delete', error));
           }
         }
       );
     } catch (e) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-      fastify.log.info(`Error in Delete: ${e}`);
-      reply.code(503).send('error');
+      reply.send(new InternalError('Delete study', e));
     }
   });
 
@@ -695,28 +698,31 @@ async function couchdb(fastify, options) {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
                 else
-                  reply
-                    .code(503)
-                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+                  reply.send(
+                    new InternalError(
+                      'Delete not completed for series',
+                      new Error(
+                        `Instance counts don't match. Deleted ${count} of ${body.rows.length}`
+                      )
+                    )
+                  );
               })
               .catch(err => {
                 // TODO send correct error codes
                 // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-                reply.code(503).send(err);
+                reply.send(new InternalError('Delete instances of a series', err));
               });
           } else {
-            fastify.log.info(error);
             // TODO send correct error codes
             // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-            reply.code(503).send(error);
+            reply.send(new InternalError('Get instances of a study to delete', error));
           }
         }
       );
     } catch (e) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-      fastify.log.info(`Error in Delete: ${e}`);
-      reply.code(503).send('error');
+      reply.send(new InternalError('Delete series', e));
     }
   });
 
