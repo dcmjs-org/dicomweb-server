@@ -5,6 +5,6 @@ module.exports = {
   dbPort: process.env.PORT || 5984,
   auth: 'none',
   logger: {
-    level: 'error',
+    level: 'info',
   },
 };

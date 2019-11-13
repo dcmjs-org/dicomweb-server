@@ -52,33 +52,18 @@ describe('STOW Tests', () => {
       });
   });
 
-  // it('stow should fail with dicom file', done => {
-  //   const buffer = fs.readFileSync('test/data/image.dcm');
-  //   chai
-  //     .request(`http://${process.env.host}:${process.env.port}`)
-  //     .post('/studies')
-  //     .set(
-  //       'content-type',
-  //       'multipart; type=application/dicom; boundary=--594b1491-fdae-4585-9b48-4d7cd999edb3'
-  //     )
-  //     .send(buffer)
-  //     .then(res => {
-  //       expect(res.statusCode).to.equal(500);
-  //       done();
-  //     })
-  //     .catch(e => {
-  //       done(e);
-  //     });
-  // });
-
-  it('it should GET all studies in stow (one study that was stowed)', done => {
+  it('stow should fail with dicom file', done => {
+    const buffer = fs.readFileSync('test/data/image.dcm');
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies')
+      .post('/studies')
+      .set(
+        'content-type',
+        'multipart; type=application/dicom; boundary=--594b1491-fdae-4585-9b48-4d7cd999edb3'
+      )
+      .send(buffer)
       .then(res => {
-        expect(res.statusCode).to.equal(200);
-        expect(res.body).to.be.a('array');
-        expect(res.body.length).to.be.eql(1);
+        expect(res.statusCode).to.equal(500);
         done();
       })
       .catch(e => {

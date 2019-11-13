@@ -63,7 +63,7 @@ async function couchdb(fastify, options) {
             }
           });
         } catch (err) {
-          fastify.log.info(`Error connecting to couchdb: ${err.message}`);
+          fastify.log.error(`Error connecting to couchdb: ${err.message}`);
           reject(err);
         }
       })
