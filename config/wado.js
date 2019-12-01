@@ -69,7 +69,7 @@ module.exports = function (doc) {
 
   for (var t in doc.dataset) {
       var dataset = doc.dataset[t];
-      if (!dataset || !dataset.Value.length) {
+      if (!dataset || !dataset.Value || !dataset.Value.length) {
         continue;
       }
 
@@ -83,6 +83,8 @@ module.exports = function (doc) {
         continue;
       }
 
+      console.log(Value);
+
       switch (vr) {
         case "PN":
           key[t].Value = [{
@@ -92,12 +94,13 @@ module.exports = function (doc) {
         case "DS":
           // Note: Some implementations, such as dcm4chee,
           // include .0 on all decimal strings, but we don't.
-          key[t].Value = Value.map(parseFloat);
+          key[t].Value = Value.map(parseFloat);  
           break;
         case "IS":
           key[t].Value = Value.map(function(a) {
             return parseInt(a, 10)
           });
+          
           break;
         case "UN":
           // TODO: Not sure what the actual limit should be,
