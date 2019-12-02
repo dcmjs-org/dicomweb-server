@@ -543,6 +543,8 @@ async function couchdb(fastify, options) {
         };
 
         const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
+
+        console.warn(JSON.stringify(dicomData.dict))
         const couchDoc = {
           _id: dicomData.dict['00080018'].Value[0],
           dataset: dicomData.dict,

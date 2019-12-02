@@ -41,7 +41,7 @@ module.exports = function returnValueFromVR(field, tag, fieldVR, required) {
   switch (vr) {
     case "PN":
       result.Value = [{
-        "Alphabetic": Value[0] || fallback
+        "Alphabetic": Value[0] || ""
       }];
       break;
     case "DS":
