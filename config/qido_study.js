@@ -1,5 +1,10 @@
-module.exports = function (doc) {
-    var studyUID;
+var buildResponse = require('./buildResponse');
+
+module.exports = function applyView(doc) {
+    if (!doc.dataset) {
+        return;
+    }
+
     var studyTags = [
         ['charset', '00080005', '', 'CS', 1],
         ['studyDate', '00080020', '', 'DA', 1],
@@ -18,37 +23,16 @@ module.exports = function (doc) {
         ['studyID', '00200010', '', 'SH', 1],
         ['numberOfStudyRelatedSeries', '00201206', '', 'IS', 1],
         ['numberOfStudyRelatedInstances', '00201208', '', 'IS', 1],
-        ['retrieveAETitle', '00080054', '', 'AE'],
-        ['studyDescription', '00081030', '', 'LO']
+        ['retrieveAETitle', '00080054', '', 'AE', 0],
+        ['studyDescription', '00081030', '', 'LO', 1]
     ];
-    var studyKey = {};
-    if (doc.dataset) {
-        studyUID = 'NA';
-        if (doc.dataset['0020000D'].Value[0]) studyUID = doc.dataset['0020000D'].Value[0];
-        var i;
-        for (i = 0; i < studyTags.length; i++) {
-            var tag = studyTags[i];
-            var name = tag[0];
-            var t = tag[1];
-            var fallback = tag[2];
-            var vr = tag[3];
-            var required = tag[4];
-            if (doc.dataset[t] && doc.dataset[t].Value && doc.dataset[t].Value[0]) {
-                if (doc.dataset[t].Value[0] !== '') {
-                    studyKey[t] = {};
-                    if (vr === 'PN') studyKey[t].Value = [{
-                        'Alphabetic': doc.dataset[t].Value[0] || fallback
-                    }];
-                    else studyKey[t].Value = [doc.dataset[t].Value[0] || fallback]
-                }
-                studyKey[t].vr = doc.dataset[t].vr || vr
-            } else {
-                if (required) {
-                    studyKey[t] = {};
-                    studyKey[t].vr = vr
-                }
-            }
-        }
-        emit([studyUID, studyKey], 1)
+
+    var studyKey = buildResponse(doc.dataset, studyTags);
+    var studyUID = 'NA';
+    
+    if (doc.dataset['0020000D'].Value[0]) {
+        studyUID = doc.dataset['0020000D'].Value[0];
     }
+
+    emit([studyUID, studyKey], 1)
 }
