@@ -4,29 +4,47 @@ const qido_study = require('./qido_study.js');
 const qido_series = require('./qido_series.js');
 const qido_instances = require('./qido_instances.js');
 const patients = require('./patients.js');
+const buildResponse = require('./buildResponse');
+const returnValueFromVR = require('./returnValueFromVR');
+const btoa = require('./btoa');
+const getBulkDataURI = require('./getBulkDataURI');
+
+function stringifyViewWithDependencies(func) {
+  return `
+    function(doc) {
+      ${btoa.toString()}
+      ${getBulkDataURI.toString()}
+      ${returnValueFromVR.toString()}
+      ${buildResponse.toString()}
+      ${func.toString()}
+
+      return applyView(doc);
+    }
+  `
+}
 
 module.exports.views = {
   wado_metadata: {
-    map: wado.toString()
+    map: stringifyViewWithDependencies(wado)
   },
   patients: {
-    map: patients.toString(),
+    map: stringifyViewWithDependencies(patients),
     reduce: '_count()',
   },
   qido_study_series: {
-    map: qido_study_series.toString(),
+    map: stringifyViewWithDependencies(qido_study_series),
     reduce: '_count()',
   },
   qido_study: {
-    map: qido_study.toString(),
+    map: stringifyViewWithDependencies(qido_study),
     reduce: '_count()',
   },
   qido_series: {
-    map: qido_series.toString(),
+    map: stringifyViewWithDependencies(qido_series),
     reduce: '_count()',
   },
   qido_instances: {
-    map: qido_instances.toString(),
+    map: stringifyViewWithDependencies(qido_instances),
     reduce: '_count()',
   },
 };

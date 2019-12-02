@@ -124,6 +124,7 @@ async function couchdb(fastify, options) {
           for (let i = 0; i < values[1].rows.length; i += 1) {
             const study = values[1].rows[i];
             const studySeriesObj = study.key[1];
+
             // add numberOfStudyRelatedInstances
             studySeriesObj['00201208'].Value = [];
             studySeriesObj['00201208'].Value.push(study.value);
