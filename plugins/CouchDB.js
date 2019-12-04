@@ -536,21 +536,12 @@ async function couchdb(fastify, options) {
       const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
-        const dicomAttach = {
-          name: 'object.dcm',
-          data: arrayBuffer,
-          content_type: '',
-        };
-
         const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
-
-        console.warn(JSON.stringify(dicomData.dict))
         const couchDoc = {
           _id: dicomData.dict['00080018'].Value[0],
           dataset: dicomData.dict,
         };
         const dicomDB = fastify.couch.db.use(config.db);
-        // promises.push(
         // eslint-disable-next-line no-await-in-loop
         await new Promise(
           (resolve, reject) =>
@@ -560,18 +551,24 @@ async function couchdb(fastify, options) {
                 fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
               }
 
-              dicomDB.multipart
-                .insert(couchDoc, [dicomAttach], couchDoc._id)
-                .then(() => {
+              dicomDB.insert(couchDoc, function(err, data) {
+                if (err) {
+                  reject(err)
+                }
+
+                // TODO: Check if this needs to be Buffer or not.
+                const body = Buffer.from(arrayBuffer);
+
+                dicomDB.attachment.insert(couchDoc._id, 'object.dcm', body, 'application/dicom', { rev: data.rev }, function(attachmentErr, data) {
+                  if (attachmentErr) {
+                    reject(attachmentErr)
+                  }
+
                   resolve('Saving successful');
                 })
-                .catch(err => {
-                  // TODO Proper error reporting implementation required
-                  reject(err);
-                });
+              })
             })
-          // )
-        );
+          );
       }
       Promise.all(promises)
         .then(() => {
