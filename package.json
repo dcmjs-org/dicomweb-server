@@ -36,7 +36,7 @@
     "start": "node server.js",
     "pretest": "eslint --ignore-path .gitignore .",
     "test": "NODE_ENV=test mocha --timeout 10000",
-    "lint": "eslint -c .eslintrc.json --fix src && prettier --write *.js",
+    "lint": "eslint -c .eslintrc.json --fix . && prettier --write *.js",
     "test_basic": "NODE_ENV=test.auth.basic mocha testAuth/basicAuthTest.js --timeout 10000",
     "test_oidc": "NODE_ENV=test.auth.oidc mocha testAuth/oidcAuthTest.js --timeout 10000"
   },

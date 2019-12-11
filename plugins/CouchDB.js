@@ -1,4 +1,4 @@
-/* eslint-disable no-underscore-dangle no-async-promise-executor */
+/* eslint-disable no-underscore-dangle, no-async-promise-executor */
 const fp = require('fastify-plugin');
 const _ = require('underscore');
 const toArrayBuffer = require('to-array-buffer');
@@ -541,32 +541,38 @@ async function couchdb(fastify, options) {
         };
         const dicomDB = fastify.couch.db.use(config.db);
         // eslint-disable-next-line no-await-in-loop
-        await new Promise(
-          (resolve, reject) =>
-            dicomDB.get(couchDoc._id, (error, existing) => {
-              if (!error) {
-                couchDoc._rev = existing._rev;
-                fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+        await new Promise((resolve, reject) =>
+          dicomDB.get(couchDoc._id, (error, existing) => {
+            if (!error) {
+              couchDoc._rev = existing._rev;
+              fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+            }
+
+            dicomDB.insert(couchDoc, (err, data) => {
+              if (err) {
+                reject(err);
               }
 
-              dicomDB.insert(couchDoc, (err, data) => {
-                if (err) {
-                  reject(err)
-                }
+              // TODO: Check if this needs to be Buffer or not.
+              const body = Buffer.from(arrayBuffer);
 
-                // TODO: Check if this needs to be Buffer or not.
-                const body = Buffer.from(arrayBuffer);
-
-                dicomDB.attachment.insert(couchDoc._id, 'object.dcm', body, 'application/dicom', { rev: data.rev }, (attachmentErr) => {
+              dicomDB.attachment.insert(
+                couchDoc._id,
+                'object.dcm',
+                body,
+                'application/dicom',
+                { rev: data.rev },
+                attachmentErr => {
                   if (attachmentErr) {
-                    reject(attachmentErr)
+                    reject(attachmentErr);
                   }
 
                   resolve('Saving successful');
-                })
-              })
-            })
-          );
+                }
+              );
+            });
+          })
+        );
       }
       Promise.all(promises)
         .then(() => {
