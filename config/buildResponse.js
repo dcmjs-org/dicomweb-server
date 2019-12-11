@@ -11,7 +11,7 @@ module.exports = function buildResponse(dataset, fields) {
 	        var fieldVR = tag[3];
 	        var required = tag[4];
 
-	        val = returnValueFromVR(dataset[t], t, fieldVR, required);
+	        val = returnValueFromVR(dataset, dataset[t], t, fieldVR, required);
 
 	        if (val) {
 	        	response[t] = val;	
@@ -19,7 +19,7 @@ module.exports = function buildResponse(dataset, fields) {
 	    }
 	} else {
 		for (var t in dataset) {
-	        val = returnValueFromVR(dataset[t], t, dataset[t].vr);
+	        val = returnValueFromVR(dataset, dataset[t], t, dataset[t].vr);
 
 	        if (val) {
 	        	response[t] = val;	

@@ -1,7 +1,7 @@
 var getBulkDataURI = require('./getBulkDataURI');
 var btoa = require('./btoa.js');
 
-module.exports = function returnValueFromVR(field, tag, fieldVR, required) {
+module.exports = function returnValueFromVR(dataset, field, tag, fieldVR, required) {
   if (!field && fieldVR && !!required) {
     // Special case for things like numberOfStudyRelatedSeries
     // which are built after the view
@@ -26,16 +26,16 @@ module.exports = function returnValueFromVR(field, tag, fieldVR, required) {
   var seriesUID = 'NA';
   var instanceUID = 'NA';
 
-  if (doc.dataset['0020000D'].Value[0]) {
-      studyUID = doc.dataset['0020000D'].Value[0];
+  if (dataset['0020000D'].Value[0]) {
+      studyUID = dataset['0020000D'].Value[0];
   }
   
-  if (doc.dataset['0020000E'].Value[0]) {
-      seriesUID = doc.dataset['0020000E'].Value[0];
+  if (dataset['0020000E'].Value[0]) {
+      seriesUID = dataset['0020000E'].Value[0];
   }
 
-  if (doc.dataset['00080018'].Value[0]) {
-      instanceUID = doc.dataset['00080018'].Value[0];
+  if (dataset['00080018'].Value[0]) {
+      instanceUID = dataset['00080018'].Value[0];
   }
 
   switch (vr) {
