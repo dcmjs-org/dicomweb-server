@@ -1,3 +1,4 @@
+/* eslint-disable */
 module.exports = function applyView(doc) {
     if (!doc.dataset) {
         return;

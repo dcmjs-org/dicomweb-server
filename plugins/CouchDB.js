@@ -1,4 +1,4 @@
-/* eslint-disable no-underscore-dangle */
+/* eslint-disable no-underscore-dangle no-async-promise-executor */
 const fp = require('fastify-plugin');
 const _ = require('underscore');
 const toArrayBuffer = require('to-array-buffer');
@@ -349,9 +349,8 @@ async function couchdb(fastify, options) {
                           else {
                             const databuffer = Buffer.concat(data);
                             fastify.log.info(
-                              `Threw error in catch. Error: ${e.message}, sending buffer of size ${
-                                databuffer.length
-                              } anyway`
+                              `Threw error in catch. Error: ${e.message}, sending buffer of size 
+                               ${databuffer.length} anyway`
                             );
                             resolve(databuffer);
                           }
@@ -363,9 +362,8 @@ async function couchdb(fastify, options) {
                         else {
                           const databuffer = Buffer.concat(data);
                           fastify.log.info(
-                            `Threw error ${error.message}, sending buffer of size ${
-                              databuffer.length
-                            } anyway`
+                            `Threw error ${error.message}, sending buffer of size 
+                             ${databuffer.length} anyway`
                           );
                           resolve(databuffer);
                         }
@@ -551,7 +549,7 @@ async function couchdb(fastify, options) {
                 fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
               }
 
-              dicomDB.insert(couchDoc, function(err, data) {
+              dicomDB.insert(couchDoc, (err, data) => {
                 if (err) {
                   reject(err)
                 }
@@ -559,7 +557,7 @@ async function couchdb(fastify, options) {
                 // TODO: Check if this needs to be Buffer or not.
                 const body = Buffer.from(arrayBuffer);
 
-                dicomDB.attachment.insert(couchDoc._id, 'object.dcm', body, 'application/dicom', { rev: data.rev }, function(attachmentErr, data) {
+                dicomDB.attachment.insert(couchDoc._id, 'object.dcm', body, 'application/dicom', { rev: data.rev }, (attachmentErr) => {
                   if (attachmentErr) {
                     reject(attachmentErr)
                   }

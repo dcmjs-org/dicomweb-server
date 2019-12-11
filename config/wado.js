@@ -1,3 +1,4 @@
+/* eslint-disable */
 var buildResponse = require('./buildResponse');
 
 module.exports = function applyView(doc) {

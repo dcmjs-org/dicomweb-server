@@ -1,3 +1,4 @@
+/* eslint-disable */
 var getBulkDataURI = require('./getBulkDataURI');
 var btoa = require('./btoa.js');
 

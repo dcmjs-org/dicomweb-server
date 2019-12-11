@@ -1,3 +1,4 @@
+/* eslint-disable */
 const returnValueFromVR = require('./returnValueFromVR');
 
 module.exports = function buildResponse(dataset, fields) {
