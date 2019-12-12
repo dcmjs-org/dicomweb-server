@@ -86,9 +86,16 @@ async function couchdb(fastify, options) {
               const seriesCounts = {};
               const seriesModalities = {};
               body.rows.forEach(study => {
-                if (!(study.key[0] in seriesCounts)) seriesCounts[study.key[0]] = 0;
-                seriesCounts[study.key[0]] += study.value;
-                if (!(study.key[0] in seriesModalities)) seriesModalities[study.key[0]] = [];
+                if (!(study.key[0] in seriesCounts)) {
+                  seriesCounts[study.key[0]] = 0;
+                }
+
+                seriesCounts[study.key[0]] += 1;
+
+                if (!(study.key[0] in seriesModalities)) {
+                  seriesModalities[study.key[0]] = [];
+                }
+
                 seriesModalities[study.key[0]].push(study.key[1]);
               });
               resolve({ count: seriesCounts, modalities: seriesModalities });
