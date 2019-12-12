@@ -23,6 +23,12 @@ describe('STOW Tests', () => {
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/studies')
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
@@ -44,6 +50,12 @@ describe('STOW Tests', () => {
       )
       .send(buffer)
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         done();
       })

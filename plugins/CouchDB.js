@@ -1,4 +1,4 @@
-/* eslint-disable no-underscore-dangle */
+/* eslint-disable no-underscore-dangle, no-async-promise-executor */
 const fp = require('fastify-plugin');
 const _ = require('underscore');
 const toArrayBuffer = require('to-array-buffer');
@@ -124,6 +124,7 @@ async function couchdb(fastify, options) {
           for (let i = 0; i < values[1].rows.length; i += 1) {
             const study = values[1].rows[i];
             const studySeriesObj = study.key[1];
+
             // add numberOfStudyRelatedInstances
             studySeriesObj['00201208'].Value = [];
             studySeriesObj['00201208'].Value.push(study.value);
@@ -348,9 +349,8 @@ async function couchdb(fastify, options) {
                           else {
                             const databuffer = Buffer.concat(data);
                             fastify.log.info(
-                              `Threw error in catch. Error: ${e.message}, sending buffer of size ${
-                                databuffer.length
-                              } anyway`
+                              `Threw error in catch. Error: ${e.message}, sending buffer of size 
+                               ${databuffer.length} anyway`
                             );
                             resolve(databuffer);
                           }
@@ -362,9 +362,8 @@ async function couchdb(fastify, options) {
                         else {
                           const databuffer = Buffer.concat(data);
                           fastify.log.info(
-                            `Threw error ${error.message}, sending buffer of size ${
-                              databuffer.length
-                            } anyway`
+                            `Threw error ${error.message}, sending buffer of size 
+                             ${databuffer.length} anyway`
                           );
                           resolve(databuffer);
                         }
@@ -535,39 +534,44 @@ async function couchdb(fastify, options) {
       const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
-        const dicomAttach = {
-          name: 'object.dcm',
-          data: arrayBuffer,
-          content_type: '',
-        };
-
         const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
         const couchDoc = {
           _id: dicomData.dict['00080018'].Value[0],
           dataset: dicomData.dict,
         };
         const dicomDB = fastify.couch.db.use(config.db);
-        // promises.push(
         // eslint-disable-next-line no-await-in-loop
-        await new Promise(
-          (resolve, reject) =>
-            dicomDB.get(couchDoc._id, (error, existing) => {
-              if (!error) {
-                couchDoc._rev = existing._rev;
-                fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+        await new Promise((resolve, reject) =>
+          dicomDB.get(couchDoc._id, (error, existing) => {
+            if (!error) {
+              couchDoc._rev = existing._rev;
+              fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+            }
+
+            dicomDB.insert(couchDoc, (err, data) => {
+              if (err) {
+                reject(err);
               }
 
-              dicomDB.multipart
-                .insert(couchDoc, [dicomAttach], couchDoc._id)
-                .then(() => {
+              // TODO: Check if this needs to be Buffer or not.
+              const body = Buffer.from(arrayBuffer);
+
+              dicomDB.attachment.insert(
+                couchDoc._id,
+                'object.dcm',
+                body,
+                'application/dicom',
+                { rev: data.rev },
+                attachmentErr => {
+                  if (attachmentErr) {
+                    reject(attachmentErr);
+                  }
+
                   resolve('Saving successful');
-                })
-                .catch(err => {
-                  // TODO Proper error reporting implementation required
-                  reject(err);
-                });
-            })
-          // )
+                }
+              );
+            });
+          })
         );
       }
       Promise.all(promises)
