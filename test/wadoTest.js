@@ -13,6 +13,12 @@ describe('WADO Tests', () => {
         '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances/1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694'
       )
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res).to.have.header(
           'Content-Disposition',
@@ -30,6 +36,12 @@ describe('WADO Tests', () => {
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/metadata')
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(19);
@@ -45,6 +57,12 @@ describe('WADO Tests', () => {
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/studies/1.3.6.1.4.1.65476457.5.2.1.1706.4996.6436336251031414136865313/metadata')
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
@@ -62,6 +80,12 @@ describe('WADO Tests', () => {
         '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/metadata'
       )
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(18);
@@ -79,6 +103,12 @@ describe('WADO Tests', () => {
         '/studies/1111111111/series/1.3.6.1.4.1.54747.5.2.1.1706.4996.4562342246724757457/metadata'
       )
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
@@ -96,6 +126,12 @@ describe('WADO Tests', () => {
         '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances/1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694/metadata'
       )
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(1);
@@ -113,6 +149,12 @@ describe('WADO Tests', () => {
         '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances/1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694/metadata'
       )
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body[0]['00080018'].Value[0]).to.be.eql(
           '1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694'
@@ -129,6 +171,12 @@ describe('WADO Tests', () => {
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/studies/1111111111/series/222222222222/instances/3333333333333/metadata')
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
