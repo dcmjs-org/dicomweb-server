@@ -19,10 +19,6 @@ module.exports = function returnValueFromVR(dataset, field, tag, fieldVR, requir
     'vr': vr
   };
 
-  if (!Value || !Value.length) {
-    return result;
-  }
-
   var studyUID = 'NA';
   var seriesUID = 'NA';
   var instanceUID = 'NA';
@@ -41,14 +37,18 @@ module.exports = function returnValueFromVR(dataset, field, tag, fieldVR, requir
 
   switch (vr) {
     case "PN":
-      result.Value = [{
-        "Alphabetic": Value[0] || ""
-      }];
+      if (Value && Value[0]) {
+        result.Value = [{
+          "Alphabetic": Value[0]
+        }];
+      }
+
       break;
     case "DS":
       // Note: Some implementations, such as dcm4chee,
       // include .0 on all decimal strings, but we don't.
-      result.Value = Value.map(parseFloat);  
+      result.Value = Value.map(parseFloat);
+
       break;
     case "IS":
       result.Value = Value.map(function(a) {
@@ -61,7 +61,10 @@ module.exports = function returnValueFromVR(dataset, field, tag, fieldVR, requir
       // but dcm4chee will use BulkDataURI if the Value
       // is too large. We should do the same
       if (Value[0].length < 100) {
-        result.InlineBinary = btoa(Value[0]);
+        var converted = btoa(Value[0]);
+        if (converted) {
+          result.InlineBinary = converted;
+        }
       } else {
         result.BulkDataURI = getBulkDataURI(studyUID, seriesUID, instanceUID, tag);
       }
@@ -71,7 +74,11 @@ module.exports = function returnValueFromVR(dataset, field, tag, fieldVR, requir
       result.BulkDataURI = getBulkDataURI(studyUID, seriesUID, instanceUID, tag);
       break;
     default:
-      result.Value = Value;
+      if (Value &&
+          Value.length &&
+          !(Value.length === 1 && (Value[0] === undefined || Value[0] === ''))) {
+        result.Value = Value;
+      }
   }
 
   return result;

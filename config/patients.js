@@ -8,7 +8,7 @@ module.exports = function applyView(doc) {
         ['institution', '00080080', '', 'CS'],
         ['patientID', '00100020', '', 'LO'],
         ['patientName', '00100010', '', 'PN'],
-        ['patientBirthDate', '00101030', '', 'DA'],
+        ['patientBirthDate', '00100030', '', 'DA'],
         ['patientSex', '00100040', '', 'CS'],
         ['charset', '00080005', '', 'CS'],
         ['retrieveURL', '00081190', '', 'UR']
