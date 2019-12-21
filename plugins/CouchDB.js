@@ -600,44 +600,51 @@ async function couchdb(fastify, options) {
           reduce: true,
           group_level: 3,
         },
-        (error, body) => {
+        async (error, body) => {
           if (!error) {
             let count = 0;
-            const deletePromises = [];
-            body.rows.forEach(instance => {
-              deletePromises.push(
-                new Promise((resolve, reject) => {
-                  dicomDB.get(instance.key[2], (getError, existing) => {
-                    if (!getError) {
-                      dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
-                        if (deleteError) {
-                          fastify.log.info(`Error deleting document for dicom ${instance.key[2]}`);
-                          reject(deleteError);
-                        } else {
-                          fastify.log.info(`Deleted document for dicom ${instance.key[2]}`);
-                          count += 1;
-                          resolve();
-                        }
-                      });
-                    }
-                  });
-                })
-              );
-            });
-            Promise.all(deletePromises)
-              .then(() => {
-                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
-                if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else
-                  reply
-                    .code(503)
-                    .send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
-              })
-              .catch(err => {
-                // TODO send correct error codes
-                // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-                reply.code(503).send(err);
+
+            // const deletePromises = [];
+            for (let i = 0; i < body.rows.length; i += 1) {
+              // deletePromises.push(
+              // console.log(body.rows[i]);
+              // eslint-disable-next-line
+              await new Promise((resolve, reject) => {
+                dicomDB.get(body.rows[i].key[2], (getError, existing) => {
+                  if (!getError) {
+                    dicomDB.destroy(body.rows[i].key[2], existing._rev, deleteError => {
+                      if (deleteError) {
+                        fastify.log.info(
+                          `Error deleting document for dicom ${body.rows[i].key[2]}`
+                        );
+                        reject(deleteError);
+                      } else {
+                        // fastify.log.info(`Deleted document for dicom ${body.rows[i].key[2]}`);
+                        count += 1;
+                        resolve();
+                      }
+                    });
+                  } else {
+                    fastify.log.warn(`Cannot find document for dicom ${body.rows[i].key[2]}`);
+                    reject(getError);
+                  }
+                });
               });
+              // );
+            }
+            // );
+            // Promise.all(deletePromises)
+            //   .then(() => {
+            fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
+            if (count === body.rows.length) reply.code(200).send('Deleted successfully');
+            else
+              reply.code(503).send(`Counts don't match. Deleted ${count} of ${body.rows.length}`);
+            // })
+            // .catch(err => {
+            //   // TODO send correct error codes
+            //   // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
+            //   reply.code(503).send(err);
+            // });
           } else {
             fastify.log.info(error);
             // TODO send correct error codes
