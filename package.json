@@ -15,6 +15,7 @@
     "fastify-couchdb": "^0.2.0",
     "fastify-plugin": "^1.6.0",
     "fastify-static": "^2.5.1",
+    "fs-extra": "^8.1.0",
     "http": "0.0.0",
     "keycloak-backend": "^2.0.0",
     "nano": "^8.1.0",

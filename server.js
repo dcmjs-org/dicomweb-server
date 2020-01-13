@@ -1,8 +1,19 @@
+const fs = require('fs-extra');
+const path = require('path');
 // eslint-disable-next-line import/order
 const config = require('./config/index');
 // Require the framework and instantiate it
 const fastify = require('fastify')({
   logger: config.logger || false,
+  https:
+    config.https === true &&
+    fs.existsSync(path.join(__dirname, 'tls.key')) &&
+    fs.existsSync(path.join(__dirname, 'tls.crt'))
+      ? {
+          key: fs.readFileSync(path.join(__dirname, 'tls.key')),
+          cert: fs.readFileSync(path.join(__dirname, 'tls.crt')),
+        }
+      : '',
 });
 
 const atob = require('atob');
