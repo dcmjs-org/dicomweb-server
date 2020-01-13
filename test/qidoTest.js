@@ -1,6 +1,7 @@
 require('./stowTest');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
+const config = require('../config/index');
 
 chai.use(chaiHttp);
 const { expect } = chai;
@@ -9,7 +10,7 @@ describe('QIDO Tests', () => {
   it('it should GET all studies (one study that was stowed)', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies')
+      .get(`${config.prefix}/studies`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -30,7 +31,7 @@ describe('QIDO Tests', () => {
   it('returned study should have uid: 1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies')
+      .get(`${config.prefix}/studies`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -52,7 +53,7 @@ describe('QIDO Tests', () => {
   it('returned study should have number of series in tags: 2', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies')
+      .get(`${config.prefix}/studies`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -72,7 +73,7 @@ describe('QIDO Tests', () => {
   it('returned study should have number of images: 19', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies')
+      .get(`${config.prefix}/studies`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -92,7 +93,9 @@ describe('QIDO Tests', () => {
   it('series endpoint should return 2 series for study 1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series')
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series`
+      )
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -113,7 +116,7 @@ describe('QIDO Tests', () => {
   it('series endpoint should return no series for madeup study 1.3.6.1.4.1.675457.5.2.1.1706.4996.2675014637636865313', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies/1.3.6.1.4.1.675457.5.2.1.1706.4996.2675014637636865313/series')
+      .get(`${config.prefix}/studies/1.3.6.1.4.1.675457.5.2.1.1706.4996.2675014637636865313/series`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -135,7 +138,7 @@ describe('QIDO Tests', () => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
-        '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances'
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances`
       )
       .then(res => {
         if (res.statusCode >= 400) {
@@ -158,7 +161,7 @@ describe('QIDO Tests', () => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
-        '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.125234324154032773868316308352/instances'
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.125234324154032773868316308352/instances`
       )
       .then(res => {
         if (res.statusCode >= 400) {
@@ -181,7 +184,7 @@ describe('QIDO Tests', () => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
-        '/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.54747.5.2.1.1706.4996.4562342246724757457/instances'
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.54747.5.2.1.1706.4996.4562342246724757457/instances`
       )
       .then(res => {
         if (res.statusCode >= 400) {
@@ -204,7 +207,7 @@ describe('QIDO Tests', () => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
-        '/studies/1111111111/series/1.3.6.1.4.1.54747.5.2.1.1706.4996.4562342246724757457/instances'
+        `${config.prefix}/studies/1111111111/series/1.3.6.1.4.1.54747.5.2.1.1706.4996.4562342246724757457/instances`
       )
       .then(res => {
         if (res.statusCode >= 400) {
