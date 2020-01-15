@@ -9,5 +9,6 @@ before_install:
   - docker pull couchdb
 install:
   - docker run -p 5984:5984 -d couchdb
-script:
+before_script:
+  - sleep 15
   - curl -X PUT localhost:5984/chronicle
