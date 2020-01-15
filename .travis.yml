@@ -5,7 +5,9 @@ node_js:
 services:
   - docker
 
-before_script:
+before_install:
   - docker pull couchdb
+install:
   - docker run -p 5984:5984 -d couchdb
+script:
   - curl -X PUT localhost:5984/chronicle
