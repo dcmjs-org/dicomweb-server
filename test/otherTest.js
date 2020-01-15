@@ -1,6 +1,7 @@
 require('./stowTest');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
+const config = require('../config/index');
 
 chai.use(chaiHttp);
 const { expect } = chai;
@@ -9,7 +10,7 @@ describe('Patients API', () => {
   it('it should GET all patients (one patient from stowed data)', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/patients')
+      .get(`${config.prefix}/patients`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -30,7 +31,7 @@ describe('Patients API', () => {
   it('returned patient should be MRI-DIR-T2_3', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/patients')
+      .get(`${config.prefix}/patients`)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
