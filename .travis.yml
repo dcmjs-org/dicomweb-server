@@ -7,8 +7,10 @@ services:
 
 before_install:
   - docker pull couchdb
+
 install:
   - docker run -p 5984:5984 -d couchdb
+  
 before_script:
   - npm ci
   - curl -X PUT localhost:5984/chronicle
