@@ -76,7 +76,7 @@ describe('STOW Tests', () => {
       )
       .send(buffer)
       .then(res => {
-        expect(res.statusCode).to.equal(503);
+        expect(res.statusCode).to.equal(500);
         done();
       })
       .catch(e => {
