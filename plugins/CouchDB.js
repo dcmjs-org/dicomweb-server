@@ -79,17 +79,25 @@ async function couchdb(fastify, options) {
           'qido_study_series',
           {
             reduce: true,
-            group_level: 2,
+            group_level: 3,
           },
           (error, body) => {
             if (!error) {
               const seriesCounts = {};
               const seriesModalities = {};
               body.rows.forEach(study => {
-                if (!(study.key[0] in seriesCounts)) seriesCounts[study.key[0]] = 0;
-                seriesCounts[study.key[0]] += study.value;
-                if (!(study.key[0] in seriesModalities)) seriesModalities[study.key[0]] = [];
-                seriesModalities[study.key[0]].push(study.key[1]);
+                if (!(study.key[0] in seriesCounts)) {
+                  seriesCounts[study.key[0]] = 0;
+                }
+
+                seriesCounts[study.key[0]] += 1;
+
+                if (!(study.key[0] in seriesModalities)) {
+                  seriesModalities[study.key[0]] = [];
+                }
+                // we should make sure each modality is referenced once
+                if (!seriesModalities[study.key[0]].includes(study.key[1]))
+                  seriesModalities[study.key[0]].push(study.key[1]);
               });
               resolve({ count: seriesCounts, modalities: seriesModalities });
             } else {
@@ -142,12 +150,21 @@ async function couchdb(fastify, options) {
                 // same study merge
                 const consequentStudySeriesObj = values[1].rows[j].key[1];
                 Object.keys(consequentStudySeriesObj).forEach(tag => {
-                  if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
+                  if (tag === '00201208') {
+                    // numberOfStudyRelatedInstances needs to be cumulated
+                    studySeriesObj['00201208'].Value[0] += values[1].rows[j].value;
+                  } else if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
                     if (consequentStudySeriesObj[tag].Value)
                       consequentStudySeriesObj[tag].Value.forEach(val => {
-                        if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [];
-                        if (!_.findIndex(studySeriesObj[tag].Value, val) === -1)
+                        if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [val];
+                        else if (
+                          // if both studies have values, cumulate them but don't make duplicates
+                          (typeof studySeriesObj[tag].Value[0] === 'string' &&
+                            !studySeriesObj[tag].Value.includes(val)) ||
+                          !_.findIndex(studySeriesObj[tag].Value, val) === -1
+                        ) {
                           studySeriesObj[tag].Value.push(val);
+                        }
                       });
                   }
                 });

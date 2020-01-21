@@ -33,7 +33,7 @@ module.exports.views = {
   },
   qido_study_series: {
     map: stringifyViewWithDependencies(qidoStudySeries),
-    reduce: '_approx_count_distinct()', // TODO: This isn't available in pouchdb
+    reduce: '_count()',
   },
   qido_study: {
     map: stringifyViewWithDependencies(qidoStudy),
