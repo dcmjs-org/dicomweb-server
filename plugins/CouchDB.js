@@ -566,19 +566,22 @@ async function couchdb(fastify, options) {
       })
     );
   });
-  fastify.decorate('stow', async (request, reply) => {
+  fastify.decorate('stow', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
-      const promises = [];
+      const promisses = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
-        // eslint-disable-next-line no-await-in-loop
-        await fastify.saveBuffer(arrayBuffer, dicomDB);
+        promisses.push(() => {
+          return fastify.saveBuffer(arrayBuffer, dicomDB);
+        });
       }
-      Promise.all(promises)
+      fastify.dbPqueue
+        .addAll(promisses)
         .then(() => {
+          fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
         })
         .catch(err => {
