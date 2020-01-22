@@ -1,6 +1,7 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const fs = require('fs');
+const config = require('../config/index');
 
 chai.use(chaiHttp);
 const { expect } = chai;
@@ -21,8 +22,14 @@ describe('STOW Tests', () => {
   it('studies should be empty', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .get('/studies')
+      .get(`${config.prefix}/studies`)
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
@@ -37,13 +44,19 @@ describe('STOW Tests', () => {
     const buffer = fs.readFileSync('test/data/multipart_study');
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .post('/studies')
+      .post(`${config.prefix}/studies`)
       .set(
         'content-type',
         'multipart/related; type=application/dicom; boundary=--594b1491-fdae-4585-9b48-4d7cd999edb3'
       )
       .send(buffer)
       .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
         expect(res.statusCode).to.equal(200);
         done();
       })
@@ -56,14 +69,14 @@ describe('STOW Tests', () => {
     const buffer = fs.readFileSync('test/data/image.dcm');
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
-      .post('/studies')
+      .post(`${config.prefix}/studies`)
       .set(
         'content-type',
         'multipart; type=application/dicom; boundary=--594b1491-fdae-4585-9b48-4d7cd999edb3'
       )
       .send(buffer)
       .then(res => {
-        expect(res.statusCode).to.equal(503);
+        expect(res.statusCode).to.equal(500);
         done();
       })
       .catch(e => {
