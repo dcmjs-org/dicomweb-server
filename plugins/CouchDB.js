@@ -566,7 +566,7 @@ async function couchdb(fastify, options) {
 
         dicomDB.insert(couchDoc, (err, data) => {
           if (err) {
-             reject(err);
+            reject(err);
           }
           // TODO: Check if this needs to be Buffer or not.
           const body = Buffer.from(arrayBuffer);
@@ -594,7 +594,7 @@ async function couchdb(fastify, options) {
       const dicomDB = fastify.couch.db.use(config.db);
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
-      // const promises = [];
+      const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
         promises.push(() => {

@@ -157,9 +157,7 @@ fastify.addHook('onError', (request, reply, error, done) => {
 });
 
 fastify.log.info(
-  `Starting a promise queue with ${
-    config.maxConcurrent
-  } concurrent promisses for managing couchdb operations`
+  `Starting a promise queue with ${config.maxConcurrent} concurrent promisses for managing couchdb operations`
 );
 const dbPq = new PQueue({ concurrency: config.maxConcurrent });
 let count = 0;
