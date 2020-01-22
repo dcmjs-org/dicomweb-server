@@ -571,15 +571,15 @@ async function couchdb(fastify, options) {
       const dicomDB = fastify.couch.db.use(config.db);
       const res = toArrayBuffer(request.body);
       const parts = dcmjs.utilities.message.multipartDecode(res);
-      const promisses = [];
+      const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
-        promisses.push(() => {
+        promises.push(() => {
           return fastify.saveBuffer(arrayBuffer, dicomDB);
         });
       }
       fastify.dbPqueue
-        .addAll(promisses)
+        .addAll(promises)
         .then(() => {
           fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
