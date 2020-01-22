@@ -615,8 +615,8 @@ async function couchdb(fastify, options) {
             let count = 0;
             const deletePromises = [];
             body.rows.forEach(instance => {
-              deletePromises.push(
-                new Promise((resolve, reject) => {
+              deletePromises.push(() => {
+                return new Promise((resolve, reject) => {
                   dicomDB.get(instance.key[2], (getError, existing) => {
                     if (!getError) {
                       dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
@@ -631,10 +631,11 @@ async function couchdb(fastify, options) {
                       });
                     }
                   });
-                })
-              );
+                });
+              });
             });
-            Promise.all(deletePromises)
+            fastify.dbPqueue
+              .addAll(deletePromises)
               .then(() => {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
@@ -681,8 +682,8 @@ async function couchdb(fastify, options) {
             let count = 0;
             const deletePromises = [];
             body.rows.forEach(instance => {
-              deletePromises.push(
-                new Promise((resolve, reject) => {
+              deletePromises.push(() => {
+                return new Promise((resolve, reject) => {
                   dicomDB.get(instance.key[2], (getError, existing) => {
                     if (!getError) {
                       dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
@@ -697,10 +698,11 @@ async function couchdb(fastify, options) {
                       });
                     }
                   });
-                })
-              );
+                });
+              });
             });
-            Promise.all(deletePromises)
+            fastify.dbPqueue
+              .addAll(deletePromises)
               .then(() => {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
