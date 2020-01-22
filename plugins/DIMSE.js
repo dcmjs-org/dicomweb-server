@@ -2,11 +2,9 @@ const fp = require('fastify-plugin');
 
 const split2 = require('split2');
 const path = require('path');
-const PromiseQueue = require('promise-queue');
 const fs = require('fs');
-const config = require('../config/index');
 const dcmtk = require('../../dcmtk-node')({
-  verbose: true,
+  verbose: false,
 });
 
 async function dimse(fastify, options) {
@@ -25,7 +23,6 @@ async function dimse(fastify, options) {
         fs.mkdirSync(path.join(__dirname, options.tempDir));
       }
 
-      const pq = new PromiseQueue(config.maxConcurrent, config.maxQueue);
       storeServer = dcmtk.storescp({
         args: [
           '-od',
@@ -40,21 +37,23 @@ async function dimse(fastify, options) {
         ],
       });
       storeServer.on('error', err => {
-        fastify.log.err(`Error on storescu server: ${err.message}`);
+        fastify.log.err(`Error on storescp server: ${err.message}`);
       });
       storeServer.on('close', (code, signal) => {
-        fastify.log.warn(`Closed storescu server with code ${code} and signal ${signal}`);
+        fastify.log.warn(`Closed storescp server with code ${code} and signal ${signal}`);
       });
       storeServer.stdout.pipe(split2()).on('data', data => {
         if (data.startsWith('# dcmdump (1/1): ')) {
           const filePath = path.join(__dirname, data.replace('# dcmdump (1/1): ', '../'));
-          pq.add(() => {
-            fastify.log.info(`Saving DIMSE file ${filePath}`);
-            return fastify.saveFile(filePath);
-          }).then(() => {
-            fastify.log.info(`Deleting DIMSE temp file ${filePath}`);
-            fs.unlinkSync(filePath);
-          });
+          fastify.dbPqueue
+            .add(() => {
+              fastify.log.info(`Saving DIMSE file ${filePath}`);
+              return fastify.saveFile(filePath);
+            })
+            .then(() => {
+              fastify.log.info(`Deleting DIMSE temp file ${filePath}`);
+              fs.unlinkSync(filePath);
+            });
         }
       });
       fastify.log.info(`DIMSE protocol started listening on port ${options.port}`);

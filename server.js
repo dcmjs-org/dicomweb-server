@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/order
 const config = require('./config/index');
+const { default: PQueue } = require('p-queue');
 // Require the framework and instantiate it
 const fastify = require('fastify')({
   logger: config.logger || false,
@@ -49,11 +50,13 @@ fastify.register(require('./plugins/CouchDB'), {
 });
 
 // register DIMSE plugin we created
-fastify.register(require('./plugins/DIMSE'), {
-  tempDir: config.DIMSETempDir,
-  aet: config.DIMSEAET,
-  port: config.DIMSEPort,
-});
+if (config.DIMSE)
+  // eslint-disable-next-line global-require
+  fastify.register(require('./plugins/DIMSE'), {
+    tempDir: config.DIMSE.tempDir,
+    aet: config.DIMSE.AET,
+    port: config.DIMSE.port,
+  });
 
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
@@ -133,6 +136,21 @@ fastify.decorate('auth', async (req, res) => {
 
 // add authentication prehandler, all requests need to be authenticated
 fastify.addHook('preHandler', fastify.auth);
+
+fastify.log.info(
+  `Starting a promise queue with ${
+    config.maxConcurrent
+  } concurrent promisses for managing couchdb operations`
+);
+const dbPq = new PQueue({ concurrency: config.maxConcurrent });
+let count = 0;
+dbPq.on('active', () => {
+  count += 1;
+  fastify.log.info(
+    `P-queue working on item #${count}.  Size: ${dbPq.size}  Pending: ${dbPq.pending}`
+  );
+});
+fastify.decorate('dbPqueue', dbPq);
 
 const port = process.env.port || '5985';
 const host = process.env.host || '0.0.0.0';

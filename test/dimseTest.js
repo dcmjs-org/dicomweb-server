@@ -11,10 +11,12 @@ chai.use(chaiHttp);
 const { expect } = chai;
 
 describe('DIMSE', () => {
+  // if no DIMSE setting skip the tests
+  if (!config.DIMSE) return;
   it('should be able to echoscu', done => {
     dcmtk.echoscu(
       {
-        args: ['-aet', config.DIMSEAET, '-aec', 'TEST', 'localhost', config.DIMSEPort],
+        args: ['-aet', config.DIMSE.AET, '-aec', 'TEST', 'localhost', config.DIMSE.port],
       },
       (err, output) => {
         expect(output.parsed.accepted).to.be.equal(true);
@@ -27,7 +29,7 @@ describe('DIMSE', () => {
   // it('should store with storescu', done => {
   //   dcmtk.storescu(
   //     {
-  //       args: ['localhost', config.DIMSEPort, 'test/data/dimse_files'],
+  //       args: ['localhost', config.DIMSE.port, 'test/data/dimse_files'],
   //     },
   //     (err, output) => {
   //       console.log(output);

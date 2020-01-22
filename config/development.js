@@ -5,9 +5,10 @@ module.exports = {
   dbPort: process.env.PORT || 5984,
   auth: 'none',
   logger: true,
-  DIMSETempDir: './data',
-  DIMSEAET: 'PACS',
-  DIMSEPort: 4002,
+  DIMSE: {
+    tempDir: './data',
+    AET: 'PACS',
+    port: 4002,
+  },
   maxConcurrent: 5,
-  maxQueue: Infinity,
 };
