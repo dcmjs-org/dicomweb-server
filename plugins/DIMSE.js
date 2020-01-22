@@ -3,7 +3,7 @@ const fp = require('fastify-plugin');
 const split2 = require('split2');
 const path = require('path');
 const fs = require('fs');
-const dcmtk = require('../../dcmtk-node')({
+const dcmtk = require('../utils/dcmtk-node')({
   verbose: false,
 });
 

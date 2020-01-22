@@ -3,7 +3,7 @@ const chai = require('chai');
 const chaiHttp = require('chai-http');
 
 const config = require('../config/index');
-const dcmtk = require('../../dcmtk-node')({
+const dcmtk = require('../utils/dcmtk-node')({
   verbose: true, // default: false
 });
 
