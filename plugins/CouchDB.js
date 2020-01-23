@@ -7,6 +7,7 @@ window = {};
 const dcmjs = require('dcmjs');
 const Axios = require('axios');
 const http = require('http');
+const fs = require('fs');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
@@ -543,65 +544,75 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('stow', async (request, reply) => {
-    try {
-      const res = toArrayBuffer(request.body);
-      const parts = dcmjs.utilities.message.multipartDecode(res);
-      // const promises = [];
-      for (let i = 0; i < parts.length; i += 1) {
-        const arrayBuffer = parts[i];
-        const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
-        const couchDoc = {
-          _id: dicomData.dict['00080018'].Value[0],
-          dataset: dicomData.dict,
-        };
-        const dicomDB = fastify.couch.db.use(config.db);
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise((resolve, reject) =>
-          dicomDB.get(couchDoc._id, (error, existing) => {
-            if (!error) {
-              couchDoc._rev = existing._rev;
-              fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
-            }
+  fastify.decorate('saveFile', filePath => {
+    const arrayBuffer = fs.readFileSync(filePath).buffer;
+    return fastify.saveBuffer(arrayBuffer);
+  });
 
-            dicomDB.insert(couchDoc, (err, data) => {
-              if (err) {
-                reject(err);
+  fastify.decorate('saveBuffer', (arrayBuffer, dicomDB) => {
+    // eslint-disable-next-line no-param-reassign
+    if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
+    const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
+    const couchDoc = {
+      _id: dicomData.dict['00080018'].Value[0],
+      dataset: dicomData.dict,
+    };
+    return new Promise((resolve, reject) =>
+      dicomDB.get(couchDoc._id, (error, existing) => {
+        if (!error) {
+          couchDoc._rev = existing._rev;
+          fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+        }
+
+        dicomDB.insert(couchDoc, (err, data) => {
+          if (err) {
+            reject(err);
+          }
+          // TODO: Check if this needs to be Buffer or not.
+          const body = Buffer.from(arrayBuffer);
+
+          dicomDB.attachment.insert(
+            couchDoc._id,
+            'object.dcm',
+            body,
+            'application/dicom',
+            { rev: data.rev },
+            attachmentErr => {
+              if (attachmentErr) {
+                reject(attachmentErr);
               }
 
-              // TODO: Check if this needs to be Buffer or not.
-              const body = Buffer.from(arrayBuffer);
-
-              dicomDB.attachment.insert(
-                couchDoc._id,
-                'object.dcm',
-                body,
-                'application/dicom',
-                { rev: data.rev },
-                attachmentErr => {
-                  if (attachmentErr) {
-                    reject(attachmentErr);
-                  }
-
-                  resolve('Saving successful');
-                }
-              );
-            });
-          })
-        );
+              resolve('Saving successful');
+            }
+          );
+        });
+      })
+    );
+  });
+  fastify.decorate('stow', (request, reply) => {
+    try {
+      const dicomDB = fastify.couch.db.use(config.db);
+      const res = toArrayBuffer(request.body);
+      const parts = dcmjs.utilities.message.multipartDecode(res);
+      const promises = [];
+      for (let i = 0; i < parts.length; i += 1) {
+        const arrayBuffer = parts[i];
+        promises.push(() => {
+          return fastify.saveBuffer(arrayBuffer, dicomDB);
+        });
       }
-      reply.code(200).send('success');
-      // this part is not functional with await in the for loop above.
-      // TODO replace with promise queue
-      // Promise.all(promises)
-      //   .then(() => {
-      //     reply.code(200).send('success');
-      //   })
-      //   .catch(err => {
-      //     // TODO Proper error reporting implementation required
-      //     // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-      //     reply.send(new InternalError('STOW', err));
-      //   });
+      fastify.dbPqueue
+        .addAll(promises)
+        .then(() => {
+          fastify.log.info(`Stow is done successfully`);
+          reply.code(200).send('success');
+        })
+        .catch(err => {
+          // TODO Proper error reporting implementation required
+          // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+          fastify.log.error(`Error in STOW: ${err}`);
+          reply.send(new InternalError('STOW save', err));
+        });
     } catch (e) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
@@ -626,8 +637,8 @@ async function couchdb(fastify, options) {
             let count = 0;
             const deletePromises = [];
             body.rows.forEach(instance => {
-              deletePromises.push(
-                new Promise((resolve, reject) => {
+              deletePromises.push(() => {
+                return new Promise((resolve, reject) => {
                   dicomDB.get(instance.key[2], (getError, existing) => {
                     if (!getError) {
                       dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
@@ -642,10 +653,11 @@ async function couchdb(fastify, options) {
                       });
                     }
                   });
-                })
-              );
+                });
+              });
             });
-            Promise.all(deletePromises)
+            fastify.dbPqueue
+              .addAll(deletePromises)
               .then(() => {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');
@@ -695,8 +707,8 @@ async function couchdb(fastify, options) {
             let count = 0;
             const deletePromises = [];
             body.rows.forEach(instance => {
-              deletePromises.push(
-                new Promise((resolve, reject) => {
+              deletePromises.push(() => {
+                return new Promise((resolve, reject) => {
                   dicomDB.get(instance.key[2], (getError, existing) => {
                     if (!getError) {
                       dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
@@ -711,10 +723,11 @@ async function couchdb(fastify, options) {
                       });
                     }
                   });
-                })
-              );
+                });
+              });
             });
-            Promise.all(deletePromises)
+            fastify.dbPqueue
+              .addAll(deletePromises)
               .then(() => {
                 fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
                 if (count === body.rows.length) reply.code(200).send('Deleted successfully');

@@ -6,4 +6,10 @@ module.exports = {
   prefix: '',
   auth: 'none',
   logger: true,
+  DIMSE: {
+    tempDir: './data',
+    AET: 'PACS',
+    port: 4002,
+  },
+  maxConcurrent: 5,
 };

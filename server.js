@@ -2,6 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 // eslint-disable-next-line import/order
 const config = require('./config/index');
+const { default: PQueue } = require('p-queue');
 // Require the framework and instantiate it
 const fastify = require('fastify')({
   logger: config.logger || false,
@@ -61,6 +62,20 @@ fastify.register(require('./plugins/CouchDB'), {
   url: `${config.dbServer}:${config.dbPort}`,
 });
 
+// register DIMSE plugin we created
+if (config.DIMSE && fs.existsSync(path.join(__dirname, '../dcmtk-node'))) {
+  // eslint-disable-next-line global-require
+  fastify.register(require('./plugins/DIMSE'), {
+    tempDir: config.DIMSE.tempDir,
+    aet: config.DIMSE.AET,
+    port: config.DIMSE.port,
+  });
+} else {
+  config.DIMSE = undefined;
+  fastify.log.warn(
+    'DIMSE is not supported. Either it is not enabled or dcmtk-node not available in the same directory with dicomweb-server'
+  );
+}
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
 fastify.register(require('./routes/qido'), { prefix: config.prefix }); // eslint-disable-line global-require
@@ -145,6 +160,19 @@ fastify.addHook('onError', (request, reply, error, done) => {
   fastify.log.error(error.message);
   done();
 });
+
+fastify.log.info(
+  `Starting a promise queue with ${config.maxConcurrent} concurrent promisses for managing couchdb operations`
+);
+const dbPq = new PQueue({ concurrency: config.maxConcurrent });
+let count = 0;
+dbPq.on('active', () => {
+  count += 1;
+  fastify.log.info(
+    `P-queue working on item #${count}.  Size: ${dbPq.size}  Pending: ${dbPq.pending}`
+  );
+});
+fastify.decorate('dbPqueue', dbPq);
 
 const port = process.env.port || '5985';
 const host = process.env.host || '0.0.0.0';
