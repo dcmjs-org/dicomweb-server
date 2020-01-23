@@ -610,8 +610,8 @@ async function couchdb(fastify, options) {
         .catch(err => {
           // TODO Proper error reporting implementation required
           // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
-          fastify.log.info(`Error in STOW: ${err}`);
-          reply.code(503).send('error');
+          fastify.log.error(`Error in STOW: ${err}`);
+          reply.send(new InternalError('STOW save', err));
         });
     } catch (e) {
       // TODO Proper error reporting implementation required

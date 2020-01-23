@@ -37,7 +37,7 @@ async function dimse(fastify, options) {
         ],
       });
       storeServer.on('error', err => {
-        fastify.log.err(`Error on storescp server: ${err.message}`);
+        fastify.log.error(`Error on storescp server: ${err.message}`);
       });
       storeServer.on('close', (code, signal) => {
         fastify.log.warn(`Closed storescp server with code ${code} and signal ${signal}`);
@@ -58,7 +58,7 @@ async function dimse(fastify, options) {
       });
       fastify.log.info(`DIMSE protocol started listening on port ${options.port}`);
     } catch (err) {
-      fastify.log.warn(`DIMSE protocol startinr error: ${err.message}`);
+      fastify.log.warn(`DIMSE protocol starting error: ${err.message}`);
     }
   });
 
@@ -66,7 +66,7 @@ async function dimse(fastify, options) {
     try {
       await fastify.initDIMSE();
     } catch (err) {
-      fastify.log.info(`Cannot init DIMSE (err:${err.message}), shutting down the server`);
+      fastify.log.error(`Cannot init DIMSE (err:${err.message}), shutting down the server`);
       fastify.close();
     }
     // need to add hook for close to remove the db if test;
