@@ -11,6 +11,6 @@ module.exports = {
   },
   maxConcurrent: 5,
   logger: {
-    level: 'error',
+    level: 'warn',
   },
 };

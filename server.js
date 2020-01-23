@@ -63,14 +63,19 @@ fastify.register(require('./plugins/CouchDB'), {
 });
 
 // register DIMSE plugin we created
-if (config.DIMSE)
+if (config.DIMSE && fs.existsSync(path.join(__dirname, '../dcmtk-node'))) {
   // eslint-disable-next-line global-require
   fastify.register(require('./plugins/DIMSE'), {
     tempDir: config.DIMSE.tempDir,
     aet: config.DIMSE.AET,
     port: config.DIMSE.port,
   });
-
+} else {
+  config.DIMSE = undefined;
+  fastify.log.warn(
+    'DIMSE is not supported. Either it is not enabled or dcmtk-node not available in the same directory with dicomweb-server'
+  );
+}
 // register routes
 // this should be done after CouchDB plugin to be able to use the accessor methods
 fastify.register(require('./routes/qido'), { prefix: config.prefix }); // eslint-disable-line global-require
