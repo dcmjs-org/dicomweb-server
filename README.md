@@ -53,9 +53,9 @@ Get study list:
 
 `dicomweb_client --url http://localhost:5985 search studies`
 
-Store a DATA_DIRECTORY of DICOM image files (here with the ".IMA" extension).  Adjust the command line to match the location and naming of your files).
+Store a DATA_DIRECTORY of DICOM image files (here with the ".IMA" extension).  Adjust the command line to match the location and naming of your files.  (The `-n25` option to xargs is for batching files, leading to fewer calls and thus less overhead.)
 
-`find DATA_DIRECTORY -iname \*.IMA -exec dicomweb_client --url http://localhost:5985 store instances \{\} \;`
+`find DATA_DIRECTORY -iname \*.IMA -print0 | xargs -0 -n25 dicomweb_client --url http://localhost:5985 store instances`
 
 
 ## Use with a viewer
