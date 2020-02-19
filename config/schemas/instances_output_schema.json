@@ -159,7 +159,7 @@
               "type": "array",
               "items": 
                 {
-                  "type": "string"
+                  "type": "integer"
                 }
             }
           },
@@ -204,6 +204,24 @@
           ]
         },
         "00280100": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": 
+                {
+                  "type": "integer"
+                }
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00280008": {
           "type": "object",
           "properties": {
             "vr": {
