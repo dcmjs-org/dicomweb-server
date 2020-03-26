@@ -1,16 +1,16 @@
 language: node_js
 node_js:
-  - '10.15'
+  - "10.15"
 
 services:
   - docker
 
 before_install:
-  - docker pull couchdb
+  - docker pull couchdb:2.3.1
 
 install:
-  - docker run -p 5984:5984 -d couchdb
-  
+  - docker run -p 5984:5984 -d couchdb:2.3.1
+
 before_script:
   - npm ci
   - curl -X PUT localhost:5984/chronicle
