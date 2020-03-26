@@ -9,7 +9,7 @@ before_install:
   - docker pull couchdb:2.3.1
 
 install:
-  - docker run -p 5984:5984 -d couchdb
+  - docker run -p 5984:5984 -d couchdb:2.3.1
 
 before_script:
   - npm ci
