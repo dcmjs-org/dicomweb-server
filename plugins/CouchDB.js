@@ -629,57 +629,31 @@ async function couchdb(fastify, options) {
         {
           startkey: [request.params.study, '', ''],
           endkey: [`${request.params.study}\u9999`, '{}', '{}'],
-          reduce: true,
-          group_level: 3,
+          reduce: false,
+          include_docs: true,
         },
-        (error, body) => {
+        async (error, body) => {
           if (!error) {
-            let count = 0;
-            const deletePromises = [];
-            body.rows.forEach(instance => {
-              deletePromises.push(() => {
-                return new Promise((resolve, reject) => {
-                  dicomDB.get(instance.key[2], (getError, existing) => {
-                    if (!getError) {
-                      dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
-                        if (deleteError) {
-                          fastify.log.info(`Error deleting document for dicom ${instance.key[2]}`);
-                          reject(deleteError);
-                        } else {
-                          fastify.log.info(`Deleted document for dicom ${instance.key[2]}`);
-                          count += 1;
-                          resolve();
-                        }
-                      });
-                    }
+            const docs = _.map(body.rows, instance => {
+              return { _id: instance.key[2], _rev: instance.doc._rev, _deleted: true };
+            });
+            await fastify.dbPqueue.add(() => {
+              return new Promise((resolve, reject) => {
+                dicomDB
+                  .bulk({ docs })
+                  .then(() => {
+                    resolve();
+                  })
+                  .catch(deleteError => {
+                    fastify.log.info(
+                      `Error deleting study ${request.params.study} with ${docs.length} dicoms`
+                    );
+                    reject(deleteError);
                   });
-                });
               });
             });
-            fastify.dbPqueue
-              .addAll(deletePromises)
-              .then(() => {
-                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
-                if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else
-                  reply.send(
-                    new InternalError(
-                      'Delete not completed for study',
-                      new Error(
-                        `Instance counts don't match. Deleted ${count} of ${body.rows.length}`
-                      )
-                    )
-                  );
-              })
-              .catch(err => {
-                // TODO send correct error codes
-                // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-                reply.send(new InternalError('Delete instances of a study', err));
-              });
-          } else {
-            // TODO send correct error codes
-            // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-            reply.send(new InternalError('Get instances of a study to delete', error));
+            fastify.log.info(`Deleted study ${request.params.study} with ${docs.length} dicoms`);
+            reply.code(200).send('Deleted successfully');
           }
         }
       );
@@ -699,57 +673,32 @@ async function couchdb(fastify, options) {
         {
           startkey: [request.params.study, request.params.series, ''],
           endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
-          reduce: true,
-          group_level: 3,
+          reduce: false,
+          include_docs: true,
         },
-        (error, body) => {
+        async (error, body) => {
           if (!error) {
-            let count = 0;
-            const deletePromises = [];
-            body.rows.forEach(instance => {
-              deletePromises.push(() => {
-                return new Promise((resolve, reject) => {
-                  dicomDB.get(instance.key[2], (getError, existing) => {
-                    if (!getError) {
-                      dicomDB.destroy(instance.key[2], existing._rev, deleteError => {
-                        if (deleteError) {
-                          fastify.log.info(`Error deleting document for dicom ${instance.key[2]}`);
-                          reject(deleteError);
-                        } else {
-                          fastify.log.info(`Deleted document for dicom ${instance.key[2]}`);
-                          count += 1;
-                          resolve();
-                        }
-                      });
-                    }
+            const docs = _.map(body.rows, instance => {
+              return { _id: instance.key[2], _rev: instance.doc._rev, _deleted: true };
+            });
+            await fastify.dbPqueue.add(() => {
+              return new Promise((resolve, reject) => {
+                dicomDB
+                  .bulk({ docs })
+                  .then(() => {
+                    resolve();
+                  })
+                  .catch(deleteError => {
+                    fastify.log.info(
+                      `Error deleting series ${request.params.series} with ${docs.length} dicoms`
+                    );
+                    reject(deleteError);
                   });
-                });
               });
             });
-            fastify.dbPqueue
-              .addAll(deletePromises)
-              .then(() => {
-                fastify.log.info(`Deleted ${count} of ${body.rows.length}`);
-                if (count === body.rows.length) reply.code(200).send('Deleted successfully');
-                else
-                  reply.send(
-                    new InternalError(
-                      'Delete not completed for series',
-                      new Error(
-                        `Instance counts don't match. Deleted ${count} of ${body.rows.length}`
-                      )
-                    )
-                  );
-              })
-              .catch(err => {
-                // TODO send correct error codes
-                // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-                reply.send(new InternalError('Delete instances of a series', err));
-              });
-          } else {
-            // TODO send correct error codes
-            // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
-            reply.send(new InternalError('Get instances of a study to delete', error));
+
+            fastify.log.info(`Deleted series ${request.params.series} with ${docs.length} dicoms`);
+            reply.code(200).send('Deleted successfully');
           }
         }
       );
