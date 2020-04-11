@@ -709,6 +709,34 @@ async function couchdb(fastify, options) {
     }
   });
 
+  fastify.decorate('getWado', async (request, reply) => {
+    try {
+      // get the datasets
+      const datasets = [];
+      const { data, boundary } = await fastify.packMultipartDicomsInternal(datasets);
+      // send response
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      reply.send(new InternalError(`getWado with params ${JSON.stringify(request.params)}`, e));
+    }
+  });
+
+  fastify.decorate(
+    'packMultipartDicomsInternal',
+    datasets =>
+      new Promise(async (resolve, reject) => {
+        try {
+          fastify.log.info(`Packing ${datasets.length} dicoms`);
+          const { data, boundary } = dcmjs.utilities.message.multipartEncode(datasets);
+          fastify.log.info(`Packed ${Buffer.byteLength(data)} bytes of data `);
+          resolve({ data, boundary });
+        } catch (err) {
+          reject(err);
+        }
+      })
+  );
+
   fastify.log.info(`Using db: ${config.db}`);
   // register couchdb
   // disables eslint check as I want this module to be standalone to be (un)pluggable
