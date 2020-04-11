@@ -232,6 +232,15 @@ async function couchdb(fastify, options) {
             }
             res.push(studySeriesObj);
           }
+          try {
+            if (request.query.limit) {
+              reply.code(200).send(res.slice(0, Number(request.query.limit)));
+            }
+          } catch (limitErr) {
+            fastify.log.warn(
+              `Cannot limit. invalid value ${request.query.limit}. Error: ${limitErr.message}`
+            );
+          }
           reply.code(200).send(res);
         })
         .catch(err => {
@@ -289,6 +298,15 @@ async function couchdb(fastify, options) {
                 res.push(seriesObj);
               }
             });
+            try {
+              if (request.query.limit) {
+                reply.code(200).send(res.slice(0, Number(request.query.limit)));
+              }
+            } catch (limitErr) {
+              fastify.log.warn(
+                `Cannot limit. invalid value ${request.query.limit}. Error: ${limitErr.message}`
+              );
+            }
             reply.code(200).send(res);
           } else {
             // TODO send correct error codes
