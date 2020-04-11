@@ -11,7 +11,7 @@ const fs = require('fs');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
-const { InternalError, ResourceNotFoundError } = require('../utils/Errors');
+const { InternalError, ResourceNotFoundError, BadRequestError } = require('../utils/Errors');
 
 async function couchdb(fastify, options) {
   fastify.decorate('init', async () => {
@@ -709,12 +709,65 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('getWado', async (request, reply) => {
+  fastify.decorate('getWado', (request, reply) => {
     try {
       // get the datasets
-      const datasets = [];
-      const { data, boundary } = await fastify.packMultipartDicomsInternal(datasets);
-      // send response
+      const dicomDB = fastify.couch.db.use(config.db);
+      let isFiltered = false;
+      const myParams = request.params;
+      if (!request.params.series) {
+        myParams.series = '';
+        myParams.seriesEnd = '{}';
+        if (!request.params.study) {
+          myParams.study = '';
+          myParams.studyEnd = '{}';
+        } else {
+          myParams.studyEnd = `${request.params.study}\u9999`;
+          isFiltered = true;
+        }
+      } else {
+        myParams.seriesEnd = `${request.params.series}\u9999`;
+        myParams.studyEnd = request.params.study;
+        isFiltered = true;
+      }
+      let filterOptions = {};
+      if (isFiltered) {
+        filterOptions = {
+          startkey: [myParams.study, myParams.series, ''],
+          endkey: [myParams.studyEnd, myParams.seriesEnd, '{}'],
+        };
+        dicomDB.view('instances', 'wado_metadata', filterOptions, async (error, body) => {
+          if (!error) {
+            try {
+              const datasetsReqs = [];
+              body.rows.forEach(async instance => {
+                datasetsReqs.push(
+                  fastify.getDicom(dicomDB.attachment.getAsStream(instance.id, 'object.dcm'))
+                );
+              });
+              const datasets = await Promise.all(datasetsReqs);
+              const { data, boundary } = await fastify.packMultipartDicomsInternal(datasets);
+              // send response
+              reply.header(
+                'Content-Type',
+                `multipart/related; type=application/dicom; boundary=${boundary}`
+              );
+              reply.header('content-length', Buffer.byteLength(data));
+              reply.send(Buffer.from(data));
+            } catch (err) {
+              reply.send(
+                new InternalError(`getWado with params ${JSON.stringify(request.params)}`, err)
+              );
+            }
+          } else {
+            reply.send(new InternalError('Retrieve series metadata from couchdb', error));
+          }
+        });
+      } else {
+        reply.send(
+          new BadRequestError('Not supported', new Error('Wado retrieve with no parameters'))
+        );
+      }
     } catch (e) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
@@ -731,6 +784,25 @@ async function couchdb(fastify, options) {
           const { data, boundary } = dcmjs.utilities.message.multipartEncode(datasets);
           fastify.log.info(`Packed ${Buffer.byteLength(data)} bytes of data `);
           resolve({ data, boundary });
+        } catch (err) {
+          reject(err);
+        }
+      })
+  );
+
+  fastify.decorate(
+    'getDicom',
+    stream =>
+      new Promise(async (resolve, reject) => {
+        try {
+          const bufs = [];
+          stream.on('data', d => {
+            bufs.push(d);
+          });
+          stream.on('end', () => {
+            const buf = Buffer.concat(bufs);
+            resolve(toArrayBuffer(buf));
+          });
         } catch (err) {
           reject(err);
         }
