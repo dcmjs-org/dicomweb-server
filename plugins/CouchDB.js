@@ -70,29 +70,19 @@ async function couchdb(fastify, options) {
       })
   );
 
-  fastify.decorate('queryStudy', (query, obj) => {
-    const keys = {
-      StudyDate: '00080020',
-      StudyTime: '00080030',
-      AccessionNumber: '00080050',
-      // ModalitiesInStudy: '00080061', // not here
-      ReferringPhysicianName: '00080090',
-      PatientName: '00100010',
-      PatientID: '00100020',
-      StudyInstanceUID: '0020000D',
-      StudyID: '00200010',
-    };
+  // pass the actual obj
+  fastify.decorate('queryObj', (query, obj, keys) => {
     const keysInQuery = Object.keys(query);
     for (let i = 0; i < keysInQuery.length; i += 1) {
       if (
         keys[keysInQuery[i]] &&
         !(
-          obj.key[1][keys[keysInQuery[i]]] &&
-          obj.key[1][keys[keysInQuery[i]]].Value &&
-          obj.key[1][keys[keysInQuery[i]]].Value[0] &&
-          ((obj.key[1][keys[keysInQuery[i]]].Value[0].Alphabetic &&
-            obj.key[1][keys[keysInQuery[i]]].Value[0].Alphabetic === query[keysInQuery[i]]) ||
-            obj.key[1][keys[keysInQuery[i]]].Value[0] === query[keysInQuery[i]])
+          obj[keys[keysInQuery[i]]] &&
+          obj[keys[keysInQuery[i]]].Value &&
+          obj[keys[keysInQuery[i]]].Value[0] &&
+          ((obj[keys[keysInQuery[i]]].Value[0].Alphabetic &&
+            obj[keys[keysInQuery[i]]].Value[0].Alphabetic === query[keysInQuery[i]]) ||
+            obj[keys[keysInQuery[i]]].Value[0].toString() === query[keysInQuery[i]])
         )
       ) {
         return false;
@@ -114,6 +104,18 @@ async function couchdb(fastify, options) {
   // add accessor methods with decorate
   fastify.decorate('getQIDOStudies', (request, reply) => {
     try {
+      const queryKeys = {
+        StudyDate: '00080020',
+        StudyTime: '00080030',
+        AccessionNumber: '00080050',
+        // ModalitiesInStudy: '00080061', // not here
+        ReferringPhysicianName: '00080090',
+        PatientName: '00100010',
+        PatientID: '00100020',
+        StudyInstanceUID: '0020000D',
+        StudyID: '00200010',
+      };
+
       const dicomDB = fastify.couch.db.use(config.db);
 
       const bodySeriesInfo = new Promise((resolve, reject) => {
@@ -171,7 +173,9 @@ async function couchdb(fastify, options) {
       Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
           const studies = {};
-          studies.rows = _.filter(values[1].rows, obj => fastify.queryStudy(request.query, obj));
+          studies.rows = _.filter(values[1].rows, obj =>
+            fastify.queryObj(request.query, obj.key[1], queryKeys)
+          );
           const res = [];
           // couch returns ordered list, merge if the study occurs multiple times consequently (due to seres listing different tags)
           for (let i = 0; i < studies.rows.length; i += 1) {
@@ -240,8 +244,29 @@ async function couchdb(fastify, options) {
     }
   });
 
+  // needs to support query with following keys
+  // Modality 00080060
+  // SeriesInstanceUID 0020000E
+  // SeriesNumber 00200011
+  // we don't have the rest in results
+  // PerformedProcedureStepStartDate 00400244
+  // PerformedProcedureStepStartTime 00400245
+  // RequestAttributeSequence 00400275
+  // &gt;ScheduledProcedureStepID 00400009
+  // &gt;RequestedProcedureID 00401001
   fastify.decorate('getQIDOSeries', (request, reply) => {
     try {
+      const queryKeys = {
+        Modality: '00080060',
+        SeriesInstanceUID: '0020000E',
+        SeriesNumber: '00200011',
+        // PerformedProcedureStepStartDate: '00400244',
+        // PerformedProcedureStepStartTime: '00400245',
+        // RequestAttributeSequence: '00400275',
+        // ScheduledProcedureStepID: '00400009',
+        // RequestedProcedureID: '00401001',
+      };
+
       const dicomDB = fastify.couch.db.use(config.db);
       dicomDB.view(
         'instances',
@@ -258,9 +283,11 @@ async function couchdb(fastify, options) {
             body.rows.forEach(series => {
               // get the actual instance object (tags only)
               const seriesObj = series.key[2];
-              seriesObj['00201209'].Value = [];
-              seriesObj['00201209'].Value.push(series.value);
-              res.push(seriesObj);
+              if (fastify.queryObj(request.query, seriesObj, queryKeys)) {
+                seriesObj['00201209'].Value = [];
+                seriesObj['00201209'].Value.push(series.value);
+                res.push(seriesObj);
+              }
             });
             reply.code(200).send(res);
           } else {
