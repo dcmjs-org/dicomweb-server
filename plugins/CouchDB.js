@@ -70,6 +70,47 @@ async function couchdb(fastify, options) {
       })
   );
 
+  fastify.decorate('queryStudy', (query, obj) => {
+    const keys = {
+      StudyDate: '00080020',
+      StudyTime: '00080030',
+      AccessionNumber: '00080050',
+      // ModalitiesInStudy: '00080061', // not here
+      ReferringPhysicianName: '00080090',
+      PatientName: '00100010',
+      PatientID: '00100020',
+      StudyInstanceUID: '0020000D',
+      StudyID: '00200010',
+    };
+    const keysInQuery = Object.keys(query);
+    for (let i = 0; i < keysInQuery.length; i += 1) {
+      if (
+        keys[keysInQuery[i]] &&
+        !(
+          obj.key[1][keys[keysInQuery[i]]] &&
+          obj.key[1][keys[keysInQuery[i]]].Value &&
+          obj.key[1][keys[keysInQuery[i]]].Value[0] &&
+          ((obj.key[1][keys[keysInQuery[i]]].Value[0].Alphabetic &&
+            obj.key[1][keys[keysInQuery[i]]].Value[0].Alphabetic === query[keysInQuery[i]]) ||
+            obj.key[1][keys[keysInQuery[i]]].Value[0] === query[keysInQuery[i]])
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // needs to support query with following keys
+  // StudyDate 00080020
+  // StudyTime 00080030
+  // AccessionNumber 00080050
+  // ModalitiesInStudy 00080061
+  // ReferringPhysicianName 00080090
+  // PatientName 00100010
+  // PatientID 00100020
+  // StudyInstanceUID 0020000D
+  // StudyID 00200010
   // add accessor methods with decorate
   fastify.decorate('getQIDOStudies', (request, reply) => {
     try {
@@ -129,10 +170,12 @@ async function couchdb(fastify, options) {
 
       Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
+          const studies = {};
+          studies.rows = _.filter(values[1].rows, obj => fastify.queryStudy(request.query, obj));
           const res = [];
           // couch returns ordered list, merge if the study occurs multiple times consequently (due to seres listing different tags)
-          for (let i = 0; i < values[1].rows.length; i += 1) {
-            const study = values[1].rows[i];
+          for (let i = 0; i < studies.rows.length; i += 1) {
+            const study = studies.rows[i];
             const studySeriesObj = study.key[1];
 
             // add numberOfStudyRelatedInstances
@@ -141,20 +184,29 @@ async function couchdb(fastify, options) {
             // add numberOfStudyRelatedSeries
             studySeriesObj['00201206'].Value = [];
             studySeriesObj['00201206'].Value.push(values[0].count[study.key[0]]);
+
             // add modalities
+            // TODO needs to be filtered by query
+            // ModalitiesInStudy 00080061
+            if (
+              request.query.ModalitiesInStudy &&
+              !values[0].modalities[study.key[0]].includes(request.query.ModalitiesInStudy)
+            )
+              // eslint-disable-next-line no-continue
+              continue;
             studySeriesObj['00080061'].Value = values[0].modalities[study.key[0]];
 
             // see if there are consequent records with the same studyuid
             const currentStudyUID = study.key[0];
-            for (let j = i + 1; j < values[1].rows.length; j += 1) {
-              const consequentStudyUID = values[1].rows[j].key[0];
+            for (let j = i + 1; j < studies.rows.length; j += 1) {
+              const consequentStudyUID = studies.rows[j].key[0];
               if (currentStudyUID === consequentStudyUID) {
                 // same study merge
-                const consequentStudySeriesObj = values[1].rows[j].key[1];
+                const consequentStudySeriesObj = studies.rows[j].key[1];
                 Object.keys(consequentStudySeriesObj).forEach(tag => {
                   if (tag === '00201208') {
                     // numberOfStudyRelatedInstances needs to be cumulated
-                    studySeriesObj['00201208'].Value[0] += values[1].rows[j].value;
+                    studySeriesObj['00201208'].Value[0] += studies.rows[j].value;
                   } else if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
                     if (consequentStudySeriesObj[tag].Value)
                       consequentStudySeriesObj[tag].Value.forEach(val => {
