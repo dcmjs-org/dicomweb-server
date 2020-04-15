@@ -14,7 +14,15 @@ class InternalError extends Error {
   }
 }
 
+class BadRequestError extends Error {
+  constructor(reason, error) {
+    super(`${reason}. Error: ${error.message}`);
+    this.data = { error, reason };
+  }
+}
+
 module.exports = {
   ResourceNotFoundError,
   InternalError,
+  BadRequestError,
 };

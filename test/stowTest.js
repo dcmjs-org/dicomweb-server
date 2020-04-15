@@ -65,6 +65,65 @@ describe('STOW Tests', () => {
       });
   });
 
+  const binaryParser = (res, cb) => {
+    res.setEncoding('binary');
+    res.data = '';
+    res.on('data', chunk => {
+      res.data += chunk;
+    });
+    res.on('end', () => {
+      cb(null, Buffer.from(res.data, 'binary'));
+    });
+  };
+
+  it('wado study should return correct amount of data', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313?format=stream`
+      )
+      .buffer()
+      .parse(binaryParser)
+      .end((err, res) => {
+        if (err) {
+          done(err);
+        }
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+        expect(res.statusCode).to.equal(200);
+        expect(Buffer.byteLength(res.body)).to.equal(Number(res.header['content-length']));
+        expect(Buffer.byteLength(res.body)).to.equal(9570313);
+        done();
+      });
+  });
+
+  it('wado series should return correct amount of data', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126?format=stream`
+      )
+      .buffer()
+      .parse(binaryParser)
+      .end((err, res) => {
+        if (err) {
+          done(err);
+        }
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+        expect(res.statusCode).to.equal(200);
+        expect(Buffer.byteLength(res.body)).to.equal(Number(res.header['content-length']));
+        expect(Buffer.byteLength(res.body)).to.equal(9486962);
+        done();
+      });
+  });
+
   it('stow should fail with dicom file', done => {
     const buffer = fs.readFileSync('test/data/image.dcm');
     chai

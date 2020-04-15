@@ -153,6 +153,41 @@ async function wadoRoutes(fastify) {
 
     handler: fastify.getInstanceMetadata,
   });
+
+  fastify.route({
+    method: 'GET',
+    url: '/studies/:study',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string',
+          },
+        },
+      },
+    },
+    handler: fastify.getWado,
+  });
+
+  fastify.route({
+    method: 'GET',
+    url: '/studies/:study/series/:series',
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          study: {
+            type: 'string',
+          },
+          series: {
+            type: 'string',
+          },
+        },
+      },
+    },
+    handler: fastify.getWado,
+  });
 }
 
 module.exports = wadoRoutes;
