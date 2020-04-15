@@ -70,9 +70,52 @@ async function couchdb(fastify, options) {
       })
   );
 
+  // pass the actual obj
+  fastify.decorate('queryObj', (query, obj, keys) => {
+    const keysInQuery = Object.keys(query);
+    for (let i = 0; i < keysInQuery.length; i += 1) {
+      if (
+        keys[keysInQuery[i]] &&
+        !(
+          obj[keys[keysInQuery[i]]] &&
+          obj[keys[keysInQuery[i]]].Value &&
+          obj[keys[keysInQuery[i]]].Value[0] &&
+          ((obj[keys[keysInQuery[i]]].Value[0].Alphabetic &&
+            obj[keys[keysInQuery[i]]].Value[0].Alphabetic === query[keysInQuery[i]]) ||
+            obj[keys[keysInQuery[i]]].Value[0].toString() === query[keysInQuery[i]])
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // needs to support query with following keys
+  // StudyDate 00080020
+  // StudyTime 00080030
+  // AccessionNumber 00080050
+  // ModalitiesInStudy 00080061
+  // ReferringPhysicianName 00080090
+  // PatientName 00100010
+  // PatientID 00100020
+  // StudyInstanceUID 0020000D
+  // StudyID 00200010
   // add accessor methods with decorate
   fastify.decorate('getQIDOStudies', (request, reply) => {
     try {
+      const queryKeys = {
+        StudyDate: '00080020',
+        StudyTime: '00080030',
+        AccessionNumber: '00080050',
+        // ModalitiesInStudy: '00080061', // not here
+        ReferringPhysicianName: '00080090',
+        PatientName: '00100010',
+        PatientID: '00100020',
+        StudyInstanceUID: '0020000D',
+        StudyID: '00200010',
+      };
+
       const dicomDB = fastify.couch.db.use(config.db);
 
       const bodySeriesInfo = new Promise((resolve, reject) => {
@@ -129,10 +172,14 @@ async function couchdb(fastify, options) {
 
       Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
+          const studies = {};
+          studies.rows = _.filter(values[1].rows, obj =>
+            fastify.queryObj(request.query, obj.key[1], queryKeys)
+          );
           const res = [];
           // couch returns ordered list, merge if the study occurs multiple times consequently (due to seres listing different tags)
-          for (let i = 0; i < values[1].rows.length; i += 1) {
-            const study = values[1].rows[i];
+          for (let i = 0; i < studies.rows.length; i += 1) {
+            const study = studies.rows[i];
             const studySeriesObj = study.key[1];
 
             // add numberOfStudyRelatedInstances
@@ -141,20 +188,29 @@ async function couchdb(fastify, options) {
             // add numberOfStudyRelatedSeries
             studySeriesObj['00201206'].Value = [];
             studySeriesObj['00201206'].Value.push(values[0].count[study.key[0]]);
+
             // add modalities
+            // TODO needs to be filtered by query
+            // ModalitiesInStudy 00080061
+            if (
+              request.query.ModalitiesInStudy &&
+              !values[0].modalities[study.key[0]].includes(request.query.ModalitiesInStudy)
+            )
+              // eslint-disable-next-line no-continue
+              continue;
             studySeriesObj['00080061'].Value = values[0].modalities[study.key[0]];
 
             // see if there are consequent records with the same studyuid
             const currentStudyUID = study.key[0];
-            for (let j = i + 1; j < values[1].rows.length; j += 1) {
-              const consequentStudyUID = values[1].rows[j].key[0];
+            for (let j = i + 1; j < studies.rows.length; j += 1) {
+              const consequentStudyUID = studies.rows[j].key[0];
               if (currentStudyUID === consequentStudyUID) {
                 // same study merge
-                const consequentStudySeriesObj = values[1].rows[j].key[1];
+                const consequentStudySeriesObj = studies.rows[j].key[1];
                 Object.keys(consequentStudySeriesObj).forEach(tag => {
                   if (tag === '00201208') {
                     // numberOfStudyRelatedInstances needs to be cumulated
-                    studySeriesObj['00201208'].Value[0] += values[1].rows[j].value;
+                    studySeriesObj['00201208'].Value[0] += studies.rows[j].value;
                   } else if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
                     if (consequentStudySeriesObj[tag].Value)
                       consequentStudySeriesObj[tag].Value.forEach(val => {
@@ -176,6 +232,15 @@ async function couchdb(fastify, options) {
             }
             res.push(studySeriesObj);
           }
+          try {
+            if (request.query.limit) {
+              reply.code(200).send(res.slice(0, Number(request.query.limit)));
+            }
+          } catch (limitErr) {
+            fastify.log.warn(
+              `Cannot limit. invalid value ${request.query.limit}. Error: ${limitErr.message}`
+            );
+          }
           reply.code(200).send(res);
         })
         .catch(err => {
@@ -188,8 +253,29 @@ async function couchdb(fastify, options) {
     }
   });
 
+  // needs to support query with following keys
+  // Modality 00080060
+  // SeriesInstanceUID 0020000E
+  // SeriesNumber 00200011
+  // we don't have the rest in results
+  // PerformedProcedureStepStartDate 00400244
+  // PerformedProcedureStepStartTime 00400245
+  // RequestAttributeSequence 00400275
+  // &gt;ScheduledProcedureStepID 00400009
+  // &gt;RequestedProcedureID 00401001
   fastify.decorate('getQIDOSeries', (request, reply) => {
     try {
+      const queryKeys = {
+        Modality: '00080060',
+        SeriesInstanceUID: '0020000E',
+        SeriesNumber: '00200011',
+        // PerformedProcedureStepStartDate: '00400244',
+        // PerformedProcedureStepStartTime: '00400245',
+        // RequestAttributeSequence: '00400275',
+        // ScheduledProcedureStepID: '00400009',
+        // RequestedProcedureID: '00401001',
+      };
+
       const dicomDB = fastify.couch.db.use(config.db);
       dicomDB.view(
         'instances',
@@ -206,10 +292,21 @@ async function couchdb(fastify, options) {
             body.rows.forEach(series => {
               // get the actual instance object (tags only)
               const seriesObj = series.key[2];
-              seriesObj['00201209'].Value = [];
-              seriesObj['00201209'].Value.push(series.value);
-              res.push(seriesObj);
+              if (fastify.queryObj(request.query, seriesObj, queryKeys)) {
+                seriesObj['00201209'].Value = [];
+                seriesObj['00201209'].Value.push(series.value);
+                res.push(seriesObj);
+              }
             });
+            try {
+              if (request.query.limit) {
+                reply.code(200).send(res.slice(0, Number(request.query.limit)));
+              }
+            } catch (limitErr) {
+              fastify.log.warn(
+                `Cannot limit. invalid value ${request.query.limit}. Error: ${limitErr.message}`
+              );
+            }
             reply.code(200).send(res);
           } else {
             // TODO send correct error codes

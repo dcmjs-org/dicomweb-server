@@ -28,6 +28,114 @@ describe('QIDO Tests', () => {
       });
   });
 
+  it('should no study with madeup study uid', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(`${config.prefix}/studies?StudyInstanceUID=1.2.34.5.7.56.457.547.`)
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(0);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('should GET study with studyuid filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies?StudyInstanceUID=1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313`
+      )
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('should GET study with studyuid filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies?StudyInstanceUID=1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313`
+      )
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+  it('should GET study with patient id and name filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(`${config.prefix}/studies?PatientID=MRI-DIR-T2_3&PatientName=MRI-DIR-T2_3`)
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('should GET study with AccessionNumber filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(`${config.prefix}/studies?AccessionNumber=2819497684894126`)
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
   it('returned study should have uid: 1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
@@ -102,10 +210,78 @@ describe('QIDO Tests', () => {
 
           return;
         }
-
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(2);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('series endpoint should return 1 series for study 1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313 with modality MR filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series?Modality=MR`
+      )
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('series endpoint should return 1 series for study 1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313 with SeriesInstanceUID filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series?SeriesInstanceUID=1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126`
+      )
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('series endpoint should return 1 series for study 1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313 with series id filter', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series?SeriesNumber=5`
+      )
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(res.body).to.be.a('array');
+        expect(res.body.length).to.be.eql(1);
         done();
       })
       .catch(e => {
