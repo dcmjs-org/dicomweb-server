@@ -76,7 +76,7 @@ describe('STOW Tests', () => {
     });
   };
 
-  it('wado study should return correct about of data', done => {
+  it('wado study should return correct amount of data', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
@@ -95,6 +95,31 @@ describe('STOW Tests', () => {
         }
         expect(res.statusCode).to.equal(200);
         expect(Buffer.byteLength(res.body)).to.equal(Number(res.header['content-length']));
+        expect(Buffer.byteLength(res.body)).to.equal(9570313);
+        done();
+      });
+  });
+
+  it('wado series should return correct amount of data', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126?format=stream`
+      )
+      .buffer()
+      .parse(binaryParser)
+      .end((err, res) => {
+        if (err) {
+          done(err);
+        }
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+        expect(res.statusCode).to.equal(200);
+        expect(Buffer.byteLength(res.body)).to.equal(Number(res.header['content-length']));
+        expect(Buffer.byteLength(res.body)).to.equal(9486962);
         done();
       });
   });
