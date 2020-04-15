@@ -235,13 +235,12 @@ async function couchdb(fastify, options) {
           try {
             if (request.query.limit) {
               reply.code(200).send(res.slice(0, Number(request.query.limit)));
-            }
+            } else reply.code(200).send(res);
           } catch (limitErr) {
             fastify.log.warn(
               `Cannot limit. invalid value ${request.query.limit}. Error: ${limitErr.message}`
             );
           }
-          reply.code(200).send(res);
         })
         .catch(err => {
           // TODO send correct error codes
@@ -301,13 +300,12 @@ async function couchdb(fastify, options) {
             try {
               if (request.query.limit) {
                 reply.code(200).send(res.slice(0, Number(request.query.limit)));
-              }
+              } else reply.code(200).send(res);
             } catch (limitErr) {
               fastify.log.warn(
                 `Cannot limit. invalid value ${request.query.limit}. Error: ${limitErr.message}`
               );
             }
-            reply.code(200).send(res);
           } else {
             // TODO send correct error codes
             // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
