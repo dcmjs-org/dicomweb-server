@@ -426,7 +426,7 @@ async function couchdb(fastify, options) {
                 // get range from couch for each frame, just forward the url for now
                 // TODO update nano
                 const frames = [];
-                const framePromisses = [];
+                const framePromises = [];
                 const frameNums = framesParam.split(',');
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
                 frameNums.forEach(frameNum => {
@@ -437,7 +437,7 @@ async function couchdb(fastify, options) {
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
-                  framePromisses.push(
+                  framePromises.push(
                     new Promise((resolve, reject) => {
                       const opt = {
                         hostname: config.dbServer.replace('http://', ''),
@@ -492,7 +492,7 @@ async function couchdb(fastify, options) {
                   );
                 });
                 // pack the frames in a multipart and send
-                Promise.all(framePromisses)
+                Promise.all(framePromises)
                   .then(frameResponses => {
                     frameResponses.forEach(response => frames.push(response));
                     const { data, boundary } = dcmjs.utilities.message.multipartEncode(
@@ -644,7 +644,7 @@ async function couchdb(fastify, options) {
     return fastify.saveBuffer(arrayBuffer);
   });
 
-  fastify.decorate('saveBuffer', (arrayBuffer, dicomDB) => {
+  fastify.decorate('saveBuffer', (arrayBuffer, dicomDB, filePath) => {
     // eslint-disable-next-line no-param-reassign
     if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
     const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
@@ -652,6 +652,7 @@ async function couchdb(fastify, options) {
       _id: dicomData.dict['00080018'].Value[0],
       dataset: dicomData.dict,
     };
+    if (filePath) couchDoc.filePath = filePath;
     return new Promise((resolve, reject) =>
       dicomDB.get(couchDoc._id, (error, existing) => {
         if (!error) {
@@ -665,25 +666,142 @@ async function couchdb(fastify, options) {
           }
           // TODO: Check if this needs to be Buffer or not.
           const body = Buffer.from(arrayBuffer);
+          if (!filePath)
+            dicomDB.attachment.insert(
+              couchDoc._id,
+              'object.dcm',
+              body,
+              'application/dicom',
+              { rev: data.rev },
+              attachmentErr => {
+                if (attachmentErr) {
+                  reject(attachmentErr);
+                }
 
-          dicomDB.attachment.insert(
-            couchDoc._id,
-            'object.dcm',
-            body,
-            'application/dicom',
-            { rev: data.rev },
-            attachmentErr => {
-              if (attachmentErr) {
-                reject(attachmentErr);
+                resolve('Saving successful');
               }
-
-              resolve('Saving successful');
-            }
-          );
+            );
+          else resolve('Saving successful');
         });
       })
     );
   });
+
+  fastify.decorate(
+    'processFolder',
+    (linkDir, dicomDB) =>
+      new Promise((resolve, reject) => {
+        fastify.log.info(`Processing folder ${linkDir}`);
+        // success variable is to check if there was at least one successful processing
+        const result = { success: false, errors: [] };
+        fs.readdir(linkDir, async (err, files) => {
+          if (err) {
+            reject(new InternalError(`Reading directory ${linkDir}`, err));
+          } else {
+            try {
+              const promises = [];
+              for (let i = 0; i < files.length; i += 1) {
+                if (files[i] !== '__MACOSX')
+                  if (fs.statSync(`${linkDir}/${files[i]}`).isDirectory() === true)
+                    try {
+                      // eslint-disable-next-line no-await-in-loop
+                      const subdirResult = await fastify.processFolder(
+                        `${linkDir}/${files[i]}`,
+                        dicomDB
+                      );
+                      if (subdirResult && subdirResult.errors && subdirResult.errors.length > 0) {
+                        result.errors = result.errors.concat(subdirResult.errors);
+                      }
+                      if (subdirResult && subdirResult.success) {
+                        result.success = result.success || subdirResult.success;
+                      }
+                    } catch (folderErr) {
+                      reject(folderErr);
+                    }
+                  else
+                    promises.push(() => {
+                      return (
+                        fastify
+                          .processFile(linkDir, files[i], dicomDB)
+                          // eslint-disable-next-line no-loop-func
+                          .catch(error => {
+                            result.errors.push(error);
+                          })
+                      );
+                    });
+              }
+              fastify.dbPqueue.addAll(promises).then(async values => {
+                try {
+                  for (let i = 0; values.length; i += 1) {
+                    if (
+                      values[i] === undefined ||
+                      (values[i].errors && values[i].errors.length === 0)
+                    ) {
+                      // one success is enough
+                      result.success = result.success || true;
+                      break;
+                    }
+                  }
+                  resolve(result);
+                } catch (saveDicomErr) {
+                  reject(saveDicomErr);
+                }
+              });
+            } catch (errDir) {
+              reject(errDir);
+            }
+          }
+        });
+      })
+  );
+
+  fastify.decorate(
+    'processFile',
+    (dir, filename, dicomDB) =>
+      new Promise((resolve, reject) => {
+        try {
+          let buffer = [];
+          const readableStream = fs.createReadStream(`${dir}/${filename}`);
+          readableStream.on('data', chunk => {
+            buffer.push(chunk);
+          });
+          readableStream.on('error', readErr => {
+            fastify.log.error(`Error in save when reading file ${dir}/${filename}: ${readErr}`);
+            reject(new InternalError(`Reading file ${dir}/${filename}`, readErr));
+          });
+          readableStream.on('close', () => {
+            readableStream.destroy();
+          });
+          readableStream.on('end', async () => {
+            buffer = Buffer.concat(buffer);
+            try {
+              const arrayBuffer = toArrayBuffer(buffer);
+              await fastify.saveBuffer(arrayBuffer, dicomDB, `${dir}/${filename}`);
+              resolve({ success: true, errors: [] });
+            } catch (err) {
+              reject(new InternalError(`Reading dicom file ${filename}`, err));
+            }
+          });
+        } catch (err) {
+          reject(new InternalError(`Processing file ${filename}`, err));
+        }
+      })
+  );
+
+  fastify.decorate('linkFolder', async (request, reply) => {
+    try {
+      const dicomDB = fastify.couch.db.use(config.db);
+      await fastify.processFolder(request.query.path, dicomDB);
+
+      fastify.log.info(`Folder ${request.query.path} linked successfully`);
+      reply.code(200).send('success');
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      reply.send(new InternalError('linkFolder', e));
+    }
+  });
+
   fastify.decorate('stow', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
