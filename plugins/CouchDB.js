@@ -351,7 +351,7 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('retrieveInstance', (request, reply) => {
+  fastify.decorate('retrieveInstance', async (request, reply) => {
     try {
       // if the query params have frame use retrieveInstanceFrames instead
       if (request.query.frame) fastify.retrieveInstanceFrames(request, reply);
@@ -359,7 +359,8 @@ async function couchdb(fastify, options) {
         const dicomDB = fastify.couch.db.use(config.db);
         const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
         reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
-        reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+        const stream = await fastify.getDicomFileAsStream(instance, dicomDB);
+        reply.code(200).send(stream);
       }
     } catch (err) {
       reply.send(
@@ -779,7 +780,9 @@ async function couchdb(fastify, options) {
               await fastify.saveBuffer(arrayBuffer, dicomDB, `${dir}/${filename}`);
               resolve({ success: true, errors: [] });
             } catch (err) {
-              reject(new InternalError(`Reading dicom file ${filename}`, err));
+              console.log('file not supported ignore');
+              resolve({ success: true, errors: [] });
+              // reject(new InternalError(`Reading dicom file ${filename}`, err));
             }
           });
         } catch (err) {
@@ -791,10 +794,13 @@ async function couchdb(fastify, options) {
   fastify.decorate('linkFolder', async (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
-      await fastify.processFolder(request.query.path, dicomDB);
-
-      fastify.log.info(`Folder ${request.query.path} linked successfully`);
-      reply.code(200).send('success');
+      const result = await fastify.processFolder(request.query.path, dicomDB);
+      if (result.success) {
+        fastify.log.info(`Folder ${request.query.path} linked successfully`);
+        reply.code(200).send('success');
+      } else {
+        reply.send(new InternalError('linkFolder', new Error(JSON.stringify(result.errors))));
+      }
     } catch (e) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
@@ -922,6 +928,25 @@ async function couchdb(fastify, options) {
     }
   });
 
+  fastify.decorate('getDicomFileAsStream', async (instance, dicomDB) => {
+    try {
+      if (typeof instance === 'string') {
+        const doc = await dicomDB.get(instance);
+        if (doc.filePath) {
+          return fs.createReadStream(doc.filePath);
+        }
+        return dicomDB.attachment.getAsStream(instance, 'object.dcm');
+      }
+      if (instance.filePath) {
+        return fs.createReadStream(instance.filePath);
+      }
+      return dicomDB.attachment.getAsStream(instance.id, 'object.dcm');
+    } catch (err) {
+      fastify.log.err('Getting DICOM as stream', err);
+    }
+    return null;
+  });
+
   fastify.decorate('getWado', (request, reply) => {
     try {
       // get the datasets
@@ -954,9 +979,7 @@ async function couchdb(fastify, options) {
             try {
               const datasetsReqs = [];
               body.rows.forEach(async instance => {
-                datasetsReqs.push(
-                  fastify.getDicom(dicomDB.attachment.getAsStream(instance.id, 'object.dcm'))
-                );
+                datasetsReqs.push(fastify.getDicomBuffer(instance, dicomDB));
               });
               const datasets = await Promise.all(datasetsReqs);
               const { data, boundary } = await fastify.packMultipartDicomsInternal(datasets);
@@ -1004,10 +1027,11 @@ async function couchdb(fastify, options) {
   );
 
   fastify.decorate(
-    'getDicom',
-    stream =>
+    'getDicomBuffer',
+    (instance, dicomDB) =>
       new Promise(async (resolve, reject) => {
         try {
+          const stream = await fastify.getDicomFileAsStream(instance, dicomDB);
           const bufs = [];
           stream.on('data', d => {
             bufs.push(d);

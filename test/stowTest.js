@@ -142,4 +142,42 @@ describe('STOW Tests', () => {
         done(e);
       });
   });
+
+  it('linkFolder should work for data folder', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .post(`${config.prefix}/linkFolder?path=test/data`)
+      .send()
+      .then(res => {
+        expect(res.statusCode).to.equal(200);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('wado image should correct amount of data', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances/1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694`
+      )
+      .buffer()
+      .parse(binaryParser)
+      .end((err, res) => {
+        if (err) {
+          done(err);
+        }
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+        expect(res.statusCode).to.equal(200);
+        const size = fs.statSync('test/data/image.dcm').size.toString();
+        expect(Buffer.byteLength(res.body)).to.equal(Number(size));
+        done();
+      });
+  });
 });
