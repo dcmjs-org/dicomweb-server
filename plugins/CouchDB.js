@@ -930,17 +930,12 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('getDicomFileAsStream', async (instance, dicomDB) => {
     try {
-      if (typeof instance === 'string') {
-        const doc = await dicomDB.get(instance);
-        if (doc.filePath) {
-          return fs.createReadStream(doc.filePath);
-        }
-        return dicomDB.attachment.getAsStream(instance, 'object.dcm');
+      let doc = instance;
+      if (typeof instance === 'string') doc = await dicomDB.get(instance);
+      if (doc.filePath) {
+        return fs.createReadStream(doc.filePath);
       }
-      if (instance.filePath) {
-        return fs.createReadStream(instance.filePath);
-      }
-      return dicomDB.attachment.getAsStream(instance.id, 'object.dcm');
+      return dicomDB.attachment.getAsStream(doc.id, 'object.dcm');
     } catch (err) {
       fastify.log.err('Getting DICOM as stream', err);
     }
