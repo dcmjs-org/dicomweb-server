@@ -373,43 +373,70 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('retrieveInstanceFrames', (request, reply) => {
-    // TODO:  this is just a non-working stuff for wado-rs frame retrieve
-    //
-    // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
-    //
-    // Issues:
-    // - Need to accept frames as a comma separated list of frame numbers (starting at 1)
-    //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
-    //   -- this means just skipping past the dicom header and returning just the PixelData.
-    // - in general, need to skip to the correct frame location for each requested frame
-    //   -- need to figure offsets out from the instance metadata (maybe precalculate?)
-    //   -- need to do a range request to get the part of the attachment corresponding to the frame
-    //        Couchdb attachments can be accessed via ranges:
-    //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
-    //        Not clear how to do this via nano.
-    //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
-    // - need to add the multipart header and content separators
+  fastify.decorate('retrieveInstanceFrames', async (request, reply) => {
     try {
+      const dicomDB = fastify.couch.db.use(config.db);
       const instance = request.params.instance || request.query.objectUID;
       const framesParam = request.params.frames || request.query.frame;
-      this.request = Axios.create({
-        baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
-      });
+      let doc = instance;
+      if (typeof instance === 'string') doc = await dicomDB.get(instance);
+      let result = {};
+      if (doc.filePath) {
+        result = await fastify.retrieveInstanceFramesFromLink(doc, framesParam);
+      } else result = await fastify.retrieveInstanceFramesFromAttachment(doc, framesParam);
+      try {
+        reply.headers({
+          'Content-Type': `multipart/related; application/octet-stream; boundary=${result.boundary}`,
+          maxContentLength: Buffer.byteLength(result.data) + 1,
+        });
+        reply.code(200).send(Buffer.from(result.data));
+      } catch (replyErr) {
+        reply.send(new InternalError('Packing frames', replyErr));
+      }
+    } catch (err) {
+      reply.send(
+        new ResourceNotFoundError('Frame', request.params.frames || request.query.frame, err)
+      );
+    }
+  });
 
-      // make a head query to get the attachment size
-      // TODO nano doesn't support db.attachment.head
-      this.request
-        .head(`/${instance}/object.dcm`)
-        .then(head => {
-          fastify.log.info(`Content length of the attachment is ${head.headers['content-length']}`);
-          const attachmentSize = Number(head.headers['content-length']);
+  fastify.decorate(
+    'retrieveInstanceFramesFromAttachment',
+    (doc, framesParam) =>
+      new Promise(async (resolve, reject) => {
+        // TODO:  this is just a non-working stuff for wado-rs frame retrieve
+        //
+        // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
+        //
+        // Issues:
+        // - Need to accept frames as a comma separated list of frame numbers (starting at 1)
+        //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
+        //   -- this means just skipping past the dicom header and returning just the PixelData.
+        // - in general, need to skip to the correct frame location for each requested frame
+        //   -- need to figure offsets out from the instance metadata (maybe precalculate?)
+        //   -- need to do a range request to get the part of the attachment corresponding to the frame
+        //        Couchdb attachments can be accessed via ranges:
+        //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
+        //        Not clear how to do this via nano.
+        //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
+        // - need to add the multipart header and content separators
+        try {
+          this.request = Axios.create({
+            baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
+          });
 
-          // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
-          const dicomDB = fastify.couch.db.use(config.db);
-          dicomDB.get(instance, (err, doc) => {
-            if (err) reply.send(new InternalError('Get instance for frame retrieval', err));
-            else {
+          // make a head query to get the attachment size
+          // TODO nano doesn't support db.attachment.head
+          this.request
+            .head(`/${doc.id}/object.dcm`)
+            .then(head => {
+              fastify.log.info(
+                `Content length of the attachment is ${head.headers['content-length']}`
+              );
+              const attachmentSize = Number(head.headers['content-length']);
+
+              // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+
               try {
                 // get tags of the instance
                 const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
@@ -443,7 +470,7 @@ async function couchdb(fastify, options) {
                       const opt = {
                         hostname: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
-                        path: `/${config.db}/${instance}/object.dcm`,
+                        path: `/${config.db}/${doc.id}/object.dcm`,
                         method: 'GET',
                         headers: { Range: range },
                       };
@@ -501,34 +528,23 @@ async function couchdb(fastify, options) {
                       undefined,
                       'application/octet-stream'
                     );
-                    try {
-                      reply.headers({
-                        'Content-Type': `multipart/related; application/octet-stream; boundary=${boundary}`,
-                        maxContentLength: Buffer.byteLength(data) + 1,
-                      });
-                      reply.code(200).send(Buffer.from(data));
-                    } catch (replyErr) {
-                      reply.send(new InternalError('Packing frames', replyErr));
-                    }
+                    resolve({ data, boundary });
                   })
                   .catch(packErr => {
-                    reply.send(new InternalError('Pack error', packErr));
+                    reject(new InternalError('Pack error', packErr));
                   });
               } catch (frameErr) {
-                reply.send(new InternalError('Not able to get frame', frameErr));
+                reject(new InternalError('Not able to get frame', frameErr));
               }
-            }
-          });
-        })
-        .catch(err => {
-          reply.send(new InternalError(`Couldn't get content length for the attachment`, err));
-        });
-    } catch (err) {
-      reply.send(
-        new ResourceNotFoundError('Frame', request.params.frames || request.query.frame, err)
-      );
-    }
-  });
+            })
+            .catch(err => {
+              reject(new InternalError(`Couldn't get content length for the attachment`, err));
+            });
+        } catch (err) {
+          reject(new ResourceNotFoundError('Frame', framesParam, err));
+        }
+      })
+  );
 
   fastify.decorate('getStudyMetadata', (request, reply) => {
     try {
