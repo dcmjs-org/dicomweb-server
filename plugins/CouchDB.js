@@ -1008,7 +1008,9 @@ async function couchdb(fastify, options) {
       if (doc.filePath) {
         return fs.createReadStream(doc.filePath);
       }
-      return dicomDB.attachment.getAsStream(doc._id, 'object.dcm');
+      // if the document is retrieved via metadata the id is in id, if document retrieved it is _id
+      const id = doc.id ? doc.id : doc._id;
+      return dicomDB.attachment.getAsStream(id, 'object.dcm');
     } catch (err) {
       fastify.log.err('Getting DICOM as stream', err);
     }
