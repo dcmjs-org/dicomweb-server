@@ -374,22 +374,70 @@ async function couchdb(fastify, options) {
   });
 
   fastify.decorate('retrieveInstanceFrames', async (request, reply) => {
+    // wado-rs frame retrieve
+    //
+    // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
+    //
+    // - Accepts frames as a comma separated list of frame numbers (starting at 1):
+    //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
+    //   -- this means just skipping past the dicom header and returning just the PixelData.
+    // - in general, need to skip to the correct frame location for each requested frame
+    //   -- need to figure offsets out from the instance metadata.
+    //   For attachments it makes a head call for attachment size and gets the document for the necessary header values, calculates the ofset and makes a range query
+    //        Couchdb attachments can be accessed via ranges:
+    //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
+    //        Not clear how to do this via nano. resolved with http range query for attachments for now
+    //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
+    //  For linked files it makes a stats call for the size, calculates the offset and makes a range read from the stream
+    // - Adds multipart header and content separators
     try {
       const dicomDB = fastify.couch.db.use(config.db);
       const instance = request.params.instance || request.query.objectUID;
       const framesParam = request.params.frames || request.query.frame;
       let doc = instance;
       if (typeof instance === 'string') doc = await dicomDB.get(instance);
-      let result = {};
-      if (doc.filePath) {
-        result = await fastify.retrieveInstanceFramesFromLink(doc, framesParam);
-      } else result = await fastify.retrieveInstanceFramesFromAttachment(doc, framesParam);
+      // get tags of the instance
+      const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
+      const numOfBits = doc.dataset['00280100'].Value[0];
+      const rows = doc.dataset['00280010'].Value[0];
+      const cols = doc.dataset['00280011'].Value[0];
+      const samplesForPixel = doc.dataset['00280002'].Value[0];
+      const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
+      let framePromises = [];
+      const frames = [];
+      if (doc.filePath)
+        framePromises = await fastify.retrieveInstanceFramesFromLink(doc, framesParam, {
+          numOfFrames,
+          numOfBits,
+          rows,
+          cols,
+          samplesForPixel,
+          frameSize,
+        });
+      else
+        framePromises = await fastify.retrieveInstanceFramesFromAttachment(doc, framesParam, {
+          numOfFrames,
+          numOfBits,
+          rows,
+          cols,
+          samplesForPixel,
+          frameSize,
+        });
+      // pack the frames in a multipart and send
+      const frameResponses = await Promise.all(framePromises);
+      frameResponses.forEach(response => frames.push(response));
+
+      const { data, boundary } = dcmjs.utilities.message.multipartEncode(
+        frames,
+        undefined,
+        'application/octet-stream'
+      );
       try {
         reply.headers({
-          'Content-Type': `multipart/related; application/octet-stream; boundary=${result.boundary}`,
-          maxContentLength: Buffer.byteLength(result.data) + 1,
+          'Content-Type': `multipart/related; application/octet-stream; boundary=${boundary}`,
+          maxContentLength: Buffer.byteLength(data) + 1,
         });
-        reply.code(200).send(Buffer.from(result.data));
+        reply.code(200).send(Buffer.from(data));
       } catch (replyErr) {
         reply.send(new InternalError('Packing frames', replyErr));
       }
@@ -402,24 +450,8 @@ async function couchdb(fastify, options) {
 
   fastify.decorate(
     'retrieveInstanceFramesFromAttachment',
-    (doc, framesParam) =>
+    (doc, framesParam, calcVars) =>
       new Promise(async (resolve, reject) => {
-        // TODO:  this is just a non-working stuff for wado-rs frame retrieve
-        //
-        // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
-        //
-        // Issues:
-        // - Need to accept frames as a comma separated list of frame numbers (starting at 1)
-        //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
-        //   -- this means just skipping past the dicom header and returning just the PixelData.
-        // - in general, need to skip to the correct frame location for each requested frame
-        //   -- need to figure offsets out from the instance metadata (maybe precalculate?)
-        //   -- need to do a range request to get the part of the attachment corresponding to the frame
-        //        Couchdb attachments can be accessed via ranges:
-        //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
-        //        Not clear how to do this via nano.
-        //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
-        // - need to add the multipart header and content separators
         try {
           this.request = Axios.create({
             baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
@@ -435,38 +467,31 @@ async function couchdb(fastify, options) {
               );
               const attachmentSize = Number(head.headers['content-length']);
 
-              // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
-
               try {
-                // get tags of the instance
-                const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
-                const numOfBits = doc.dataset['00280100'].Value[0];
-                const rows = doc.dataset['00280010'].Value[0];
-                const cols = doc.dataset['00280011'].Value[0];
-                const samplesForPixel = doc.dataset['00280002'].Value[0];
-                const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
                 // TODO Number should be removed after IS is corrected
-                const headerSize = attachmentSize - frameSize * Number(numOfFrames);
+                const headerSize =
+                  attachmentSize - calcVars.frameSize * Number(calcVars.numOfFrames);
                 fastify.log.info(
-                  `numOfFrames: ${numOfFrames}, numOfBits: ${numOfBits}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
+                  `numOfFrames: ${calcVars.numOfFrames}, numOfBits: ${calcVars.numOfBits}, rows : ${calcVars.rows}, cols: ${calcVars.cols}, samplesForPixel: ${calcVars.samplesForPixel}, frameSize: ${calcVars.frameSize}, headerSize: ${calcVars.headerSize}`
                 );
 
                 // get range from couch for each frame, just forward the url for now
                 // TODO update nano
-                const frames = [];
                 const framePromises = [];
                 const frameNums = framesParam.split(',');
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
                 frameNums.forEach(frameNum => {
                   const frameNo = Number(frameNum);
-                  const range = `bytes=${headerSize + frameSize * (frameNo - 1)}-${headerSize -
+                  // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+                  const range = `bytes=${headerSize +
+                    calcVars.frameSize * (frameNo - 1)}-${headerSize -
                     1 +
-                    frameSize * frameNo}`;
+                    calcVars.frameSize * frameNo}`;
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
                   framePromises.push(
-                    new Promise((resolve, reject) => {
+                    new Promise((rangeResolve, rangeReject) => {
                       const opt = {
                         hostname: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
@@ -488,30 +513,30 @@ async function couchdb(fastify, options) {
                           });
                           res.on('end', () => {
                             const databuffer = Buffer.concat(data);
-                            resolve(databuffer);
+                            rangeResolve(databuffer);
                           });
                         } catch (e) {
-                          if (data.length === 0) reject(new Error('Empty buffer'));
+                          if (data.length === 0) rangeReject(new Error('Empty buffer'));
                           else {
                             const databuffer = Buffer.concat(data);
                             fastify.log.info(
                               `Threw error in catch. Error: ${e.message}, sending buffer of size 
                                ${databuffer.length} anyway`
                             );
-                            resolve(databuffer);
+                            rangeResolve(databuffer);
                           }
                         }
                       });
 
                       req.on('error', error => {
-                        if (data.length === 0) reject(new Error('Empty buffer'));
+                        if (data.length === 0) rangeReject(new Error('Empty buffer'));
                         else {
                           const databuffer = Buffer.concat(data);
                           fastify.log.info(
                             `Threw error ${error.message}, sending buffer of size 
                              ${databuffer.length} anyway`
                           );
-                          resolve(databuffer);
+                          rangeResolve(databuffer);
                         }
                       });
 
@@ -519,20 +544,7 @@ async function couchdb(fastify, options) {
                     })
                   );
                 });
-                // pack the frames in a multipart and send
-                Promise.all(framePromises)
-                  .then(frameResponses => {
-                    frameResponses.forEach(response => frames.push(response));
-                    const { data, boundary } = dcmjs.utilities.message.multipartEncode(
-                      frames,
-                      undefined,
-                      'application/octet-stream'
-                    );
-                    resolve({ data, boundary });
-                  })
-                  .catch(packErr => {
-                    reject(new InternalError('Pack error', packErr));
-                  });
+                resolve(framePromises);
               } catch (frameErr) {
                 reject(new InternalError('Not able to get frame', frameErr));
               }
@@ -540,6 +552,51 @@ async function couchdb(fastify, options) {
             .catch(err => {
               reject(new InternalError(`Couldn't get content length for the attachment`, err));
             });
+        } catch (err) {
+          reject(new ResourceNotFoundError('Frame', framesParam, err));
+        }
+      })
+  );
+
+  fastify.decorate(
+    'retrieveInstanceFramesFromLink',
+    (doc, framesParam, calcVars) =>
+      new Promise(async (resolve, reject) => {
+        try {
+          const fileSize = fs.statSync(doc.filePath).size;
+
+          // TODO Number should be removed after IS is corrected
+          const headerSize = fileSize - calcVars.frameSize * Number(calcVars.numOfFrames);
+          fastify.log.info(
+            `numOfFrames: ${calcVars.numOfFrames}, numOfBits: ${calcVars.numOfBits}, rows : ${calcVars.rows}, cols: ${calcVars.cols}, samplesForPixel: ${calcVars.samplesForPixel}, frameSize: ${calcVars.frameSize}, headerSize: ${headerSize}`
+          );
+
+          fs.open(doc.filePath, 'r', (error, fd) => {
+            if (error) {
+              reject(new InternalError('Opening linked DICOM file', error));
+            }
+            // get range from couch for each frame, just forward the url for now
+            // TODO update nano
+            const framePromises = [];
+            const frameNums = framesParam.split(',');
+            fastify.log.info(`frameNums that are sent : ${frameNums}`);
+            frameNums.forEach(frameNum => {
+              const frameNo = Number(frameNum);
+              // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+              const offset = headerSize + calcVars.frameSize * (frameNo - 1);
+              fastify.log.info(`headerSize: ${headerSize}, frameNo: ${frameNo}, offset: ${offset}`);
+              const buffer = Buffer.alloc(calcVars.frameSize);
+              framePromises.push(
+                new Promise((rangeResolve, rangeReject) => {
+                  fs.read(fd, buffer, 0, calcVars.frameSize, offset, (err, __, databuffer) => {
+                    if (err) rangeReject(new InternalError('Reading frame buffer', err));
+                    rangeResolve(databuffer);
+                  });
+                })
+              );
+            });
+            resolve(framePromises);
+          });
         } catch (err) {
           reject(new ResourceNotFoundError('Frame', framesParam, err));
         }

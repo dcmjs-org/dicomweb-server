@@ -175,8 +175,8 @@ describe('STOW Tests', () => {
           return;
         }
         expect(res.statusCode).to.equal(200);
-        const size = fs.statSync('test/data/image.dcm').size.toString();
-        expect(Buffer.byteLength(res.body)).to.equal(Number(size));
+        const { size } = fs.statSync('test/data/image.dcm');
+        expect(Buffer.byteLength(res.body)).to.equal(size);
         done();
       });
   });
