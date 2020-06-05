@@ -8,6 +8,7 @@ const dcmjs = require('dcmjs');
 const Axios = require('axios');
 const http = require('http');
 const fs = require('fs');
+const md5 = require('md5');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
@@ -721,16 +722,29 @@ async function couchdb(fastify, options) {
   fastify.decorate('saveBuffer', (arrayBuffer, dicomDB, filePath) => {
     // eslint-disable-next-line no-param-reassign
     if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
+    // TODO: Check if this needs to be Buffer or not.
+    const body = Buffer.from(arrayBuffer);
+    const incomingMd5 = md5(body);
     const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
     const couchDoc = {
       _id: dicomData.dict['00080018'].Value[0],
       dataset: dicomData.dict,
+      md5hash: incomingMd5,
     };
     if (filePath) couchDoc.filePath = filePath;
     return new Promise((resolve, reject) =>
       dicomDB.get(couchDoc._id, (error, existing) => {
         if (!error) {
           couchDoc._rev = existing._rev;
+          // old documents won't have md5
+          if (existing.md5hash) {
+            // get the md5 of the buffer
+            if (existing.md5hash === incomingMd5) {
+              fastify.log.info(`${couchDoc._id} is already in the system with same hash`);
+              resolve('File already in system');
+              return;
+            }
+          }
           fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
         }
 
@@ -738,8 +752,7 @@ async function couchdb(fastify, options) {
           if (err) {
             reject(err);
           }
-          // TODO: Check if this needs to be Buffer or not.
-          const body = Buffer.from(arrayBuffer);
+
           if (!filePath)
             dicomDB.attachment.insert(
               couchDoc._id,
