@@ -457,11 +457,10 @@ async function couchdb(fastify, options) {
           this.request = Axios.create({
             baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
           });
-
           // make a head query to get the attachment size
           // TODO nano doesn't support db.attachment.head
           this.request
-            .head(`/${doc.id}/object.dcm`)
+            .head(`/${doc._id}/object.dcm`)
             .then(head => {
               fastify.log.info(
                 `Content length of the attachment is ${head.headers['content-length']}`
@@ -496,7 +495,7 @@ async function couchdb(fastify, options) {
                       const opt = {
                         hostname: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
-                        path: `/${config.db}/${doc.id}/object.dcm`,
+                        path: `/${config.db}/${doc._id}/object.dcm`,
                         method: 'GET',
                         headers: { Range: range },
                       };
@@ -739,7 +738,11 @@ async function couchdb(fastify, options) {
           // old documents won't have md5
           if (existing.md5hash) {
             // get the md5 of the buffer
-            if (existing.md5hash === incomingMd5) {
+            if (
+              existing.md5hash === incomingMd5 && // same md5
+              ((filePath && couchDoc.filePath && couchDoc.filePath === filePath) || // filepath sent (saving as a link) and it was saved as a link to same path before
+                (!filePath && !couchDoc.filePath)) // no filepath (saving as attachment) and it wasn't saved as a link before
+            ) {
               fastify.log.info(`${couchDoc._id} is already in the system with same hash`);
               resolve('File already in system');
               return;

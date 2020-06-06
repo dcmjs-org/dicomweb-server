@@ -157,7 +157,7 @@ describe('STOW Tests', () => {
       });
   });
 
-  it('wado image should correct amount of data', done => {
+  it('wado image should return correct amount of data', done => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
