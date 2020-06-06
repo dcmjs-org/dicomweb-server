@@ -457,10 +457,11 @@ async function couchdb(fastify, options) {
           this.request = Axios.create({
             baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
           });
+          const id = doc.id ? doc.id : doc._id;
           // make a head query to get the attachment size
           // TODO nano doesn't support db.attachment.head
           this.request
-            .head(`/${doc._id}/object.dcm`)
+            .head(`/${id}/object.dcm`)
             .then(head => {
               fastify.log.info(
                 `Content length of the attachment is ${head.headers['content-length']}`
@@ -495,7 +496,7 @@ async function couchdb(fastify, options) {
                       const opt = {
                         hostname: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
-                        path: `/${config.db}/${doc._id}/object.dcm`,
+                        path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
                         headers: { Range: range },
                       };
@@ -740,8 +741,8 @@ async function couchdb(fastify, options) {
             // get the md5 of the buffer
             if (
               existing.md5hash === incomingMd5 && // same md5
-              ((filePath && couchDoc.filePath && couchDoc.filePath === filePath) || // filepath sent (saving as a link) and it was saved as a link to same path before
-                (!filePath && !couchDoc.filePath)) // no filepath (saving as attachment) and it wasn't saved as a link before
+              ((filePath && existing.filePath && existing.filePath === filePath) || // filepath sent (saving as a link) and it was saved as a link to same path before
+                (!filePath && !existing.filePath)) // no filepath (saving as attachment) and it wasn't saved as a link before
             ) {
               fastify.log.info(`${couchDoc._id} is already in the system with same hash`);
               resolve('File already in system');
@@ -755,7 +756,6 @@ async function couchdb(fastify, options) {
           if (err) {
             reject(err);
           }
-
           if (!filePath)
             dicomDB.attachment.insert(
               couchDoc._id,
@@ -767,7 +767,6 @@ async function couchdb(fastify, options) {
                 if (attachmentErr) {
                   reject(attachmentErr);
                 }
-
                 resolve('Saving successful');
               }
             );
@@ -869,9 +868,8 @@ async function couchdb(fastify, options) {
               await fastify.saveBuffer(arrayBuffer, dicomDB, `${dir}/${filename}`);
               resolve({ success: true, errors: [] });
             } catch (err) {
-              console.log('file not supported ignore');
+              fastify.log.warn(`File not supported ignoring ${filename}`);
               resolve({ success: true, errors: [] });
-              // reject(new InternalError(`Reading dicom file ${filename}`, err));
             }
           });
         } catch (err) {
@@ -882,13 +880,22 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('linkFolder', async (request, reply) => {
     try {
-      const dicomDB = fastify.couch.db.use(config.db);
-      const result = await fastify.processFolder(request.query.path, dicomDB);
-      if (result.success) {
-        fastify.log.info(`Folder ${request.query.path} linked successfully`);
-        reply.code(200).send('success');
+      if (request.req.hostname.startsWith('localhost')) {
+        const dicomDB = fastify.couch.db.use(config.db);
+        const result = await fastify.processFolder(request.query.path, dicomDB);
+        if (result.success) {
+          fastify.log.info(`Folder ${request.query.path} linked successfully`);
+          reply.code(200).send('success');
+        } else {
+          reply.send(new InternalError('linkFolder', new Error(JSON.stringify(result.errors))));
+        }
       } else {
-        reply.send(new InternalError('linkFolder', new Error(JSON.stringify(result.errors))));
+        reply.send(
+          new BadRequestError(
+            'Not supported',
+            new Error('Linkfolder functionality is only supported for localhost')
+          )
+        );
       }
     } catch (e) {
       // TODO Proper error reporting implementation required
@@ -1018,19 +1025,14 @@ async function couchdb(fastify, options) {
   });
 
   fastify.decorate('getDicomFileAsStream', async (instance, dicomDB) => {
-    try {
-      let doc = instance;
-      if (typeof instance === 'string') doc = await dicomDB.get(instance);
-      if (doc.filePath) {
-        return fs.createReadStream(doc.filePath);
-      }
-      // if the document is retrieved via metadata the id is in id, if document retrieved it is _id
-      const id = doc.id ? doc.id : doc._id;
-      return dicomDB.attachment.getAsStream(id, 'object.dcm');
-    } catch (err) {
-      fastify.log.err('Getting DICOM as stream', err);
+    let doc = instance;
+    if (typeof instance === 'string') doc = await dicomDB.get(instance);
+    if (doc.filePath) {
+      return fs.createReadStream(doc.filePath);
     }
-    return null;
+    // if the document is retrieved via metadata the id is in id, if document retrieved it is _id
+    const id = doc.id ? doc.id : doc._id;
+    return dicomDB.attachment.getAsStream(id, 'object.dcm');
   });
 
   fastify.decorate('getWado', (request, reply) => {
@@ -1059,13 +1061,16 @@ async function couchdb(fastify, options) {
         filterOptions = {
           startkey: [myParams.study, myParams.series, ''],
           endkey: [myParams.studyEnd, myParams.seriesEnd, '{}'],
+          reduce: false,
+          include_docs: true,
         };
-        dicomDB.view('instances', 'wado_metadata', filterOptions, async (error, body) => {
+
+        dicomDB.view('instances', 'qido_instances', filterOptions, async (error, body) => {
           if (!error) {
             try {
               const datasetsReqs = [];
-              body.rows.forEach(async instance => {
-                datasetsReqs.push(fastify.getDicomBuffer(instance, dicomDB));
+              body.rows.forEach(instance => {
+                datasetsReqs.push(fastify.getDicomBuffer(instance.doc, dicomDB));
               });
               const datasets = await Promise.all(datasetsReqs);
               const { data, boundary } = await fastify.packMultipartDicomsInternal(datasets);
@@ -1131,6 +1136,13 @@ async function couchdb(fastify, options) {
         }
       })
   );
+
+  fastify.addHook('onError', (request, reply, error, done) => {
+    if (error instanceof ResourceNotFoundError) reply.code(404);
+    else if (error instanceof InternalError) reply.code(500);
+    else if (error instanceof BadRequestError) reply.code(400);
+    done();
+  });
 
   fastify.log.info(`Using db: ${config.db}`);
   // register couchdb
