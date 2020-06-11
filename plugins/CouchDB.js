@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle, no-async-promise-executor */
 const fp = require('fastify-plugin');
+const _ = require('underscore');
 const toArrayBuffer = require('to-array-buffer');
 // eslint-disable-next-line no-global-assign
 window = {};
@@ -176,7 +177,7 @@ async function couchdb(fastify, options) {
       Promise.all([bodySeriesInfo, bodyStudies])
         .then(values => {
           const studies = {};
-          studies.rows = values[1].rows.filter(obj =>
+          studies.rows = _.filter(values[1].rows, obj =>
             fastify.queryObj(request.query, obj.key[1], queryKeys)
           );
           const res = [];
@@ -222,7 +223,7 @@ async function couchdb(fastify, options) {
                           // if both studies have values, cumulate them but don't make duplicates
                           (typeof studySeriesObj[tag].Value[0] === 'string' &&
                             !studySeriesObj[tag].Value.includes(val)) ||
-                          !studySeriesObj[tag].Value.findIndex(val) === -1
+                          !_.findIndex(studySeriesObj[tag].Value, val) === -1
                         ) {
                           studySeriesObj[tag].Value.push(val);
                         }
@@ -743,7 +744,7 @@ async function couchdb(fastify, options) {
         },
         async (error, body) => {
           if (!error) {
-            const docs = body.rows.map(instance => {
+            const docs = _.map(body.rows, instance => {
               return { _id: instance.key[2], _rev: instance.doc._rev, _deleted: true };
             });
             await fastify.dbPqueue.add(() => {
@@ -787,7 +788,7 @@ async function couchdb(fastify, options) {
         },
         async (error, body) => {
           if (!error) {
-            const docs = body.rows.map(instance => {
+            const docs = _.map(body.rows, instance => {
               return { _id: instance.key[2], _rev: instance.doc._rev, _deleted: true };
             });
             await fastify.dbPqueue.add(() => {
