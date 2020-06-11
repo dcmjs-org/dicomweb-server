@@ -1,6 +1,6 @@
 {
   "name": "dicomweb-server",
-  "version": "1.0.0",
+  "version": "0.0.0-development",
   "description": "Lightweight DICOMweb Server with CouchDB",
   "main": "server.js",
   "dependencies": {

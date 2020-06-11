@@ -1,0 +1,68 @@
+version: 2
+
+defaults: &defaults
+  working_directory: ~/repo
+  docker:
+    - image: circleci/node:latest
+    - image: couchdb:2.3.1
+      command:
+
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package.json" }}
+            - v1-dependencies-
+      - run: npm ci
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
+      # Create the Chronicle Database
+      - run:
+          command: curl -X PUT localhost:5984/chronicle
+      - run: npm run test
+
+  # Used to publish latest
+  deploy:
+    <<: *defaults
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package.json" }}
+            - v1-dependencies-
+      - run: npm ci
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
+      - run:
+          name: Write NPM Token to ~/.npmrc
+          command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/repo/.npmrc
+      - run:
+          name: Publish package
+          command: npx semantic-release@17.0.4
+
+workflows:
+  version: 2
+
+  # PULL REQUEST
+  test:
+    jobs:
+      - test:
+          filters:
+            branches:
+              ignore:
+                - master
+
+  # MERGE TO MASTER
+  build-test-deploy:
+    jobs:
+      - deploy:
+          filters:
+            branches:
+              only: master
