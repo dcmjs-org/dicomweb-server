@@ -104,8 +104,11 @@ async function couchdb(fastify, options) {
   // add accessor methods with decorate
   fastify.decorate('getQIDOStudies', (request, reply) => {
     try {
+      // TODO: Commented out StudyDate because it doesn't actually
+      // filter by StudyDate unless it's an exact match, and so it
+      // was returning no results for the OHIF Study List
       const queryKeys = {
-        StudyDate: '00080020',
+        // StudyDate: '00080020',
         StudyTime: '00080030',
         AccessionNumber: '00080050',
         // ModalitiesInStudy: '00080061', // not here
