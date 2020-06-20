@@ -6,6 +6,17 @@ const config = require('../config/index');
 chai.use(chaiHttp);
 const { expect } = chai;
 
+const binaryParser = (res, cb) => {
+  res.setEncoding('binary');
+  res.data = '';
+  res.on('data', chunk => {
+    res.data += chunk;
+  });
+  res.on('end', () => {
+    cb(null, Buffer.from(res.data, 'binary'));
+  });
+};
+
 describe('WADO Tests', () => {
   it('it should get dicom file for instance 1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694', done => {
     chai
@@ -13,6 +24,8 @@ describe('WADO Tests', () => {
       .get(
         `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances/1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694`
       )
+      .buffer()
+      .parse(binaryParser)
       .then(res => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
@@ -25,6 +38,32 @@ describe('WADO Tests', () => {
           'Content-Disposition',
           'attachment; filename=1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694.dcm'
         );
+        expect(Buffer.byteLength(res.body)).to.equal(526934);
+        done();
+      })
+      .catch(e => {
+        done(e);
+      });
+  });
+
+  it('it should get first frame of dicom file for instance 1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694', done => {
+    chai
+      .request(`http://${process.env.host}:${process.env.port}`)
+      .get(
+        `${config.prefix}/studies/1.3.6.1.4.1.14519.5.2.1.1706.4996.267501199180251031414136865313/series/1.3.6.1.4.1.14519.5.2.1.1706.4996.170872952012850866993878606126/instances/1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694/frames/1`
+      )
+      .buffer()
+      .parse(binaryParser)
+      .then(res => {
+        if (res.statusCode >= 400) {
+          done(new Error(res.body.error, res.body.message));
+
+          return;
+        }
+
+        expect(res.statusCode).to.equal(200);
+        expect(Buffer.byteLength(res.body)).to.equal(Number(res.header['content-length']));
+        expect(Buffer.byteLength(res.body)).to.equal(524414);
         done();
       })
       .catch(e => {

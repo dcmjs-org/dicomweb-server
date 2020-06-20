@@ -355,7 +355,7 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('retrieveInstance', (request, reply) => {
+  fastify.decorate('retrieveInstance', async (request, reply) => {
     try {
       // if the query params have frame use retrieveInstanceFrames instead
       if (request.query.frame) fastify.retrieveInstanceFrames(request, reply);
@@ -363,7 +363,8 @@ async function couchdb(fastify, options) {
         const dicomDB = fastify.couch.db.use(config.db);
         const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
         reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
-        reply.code(200).send(dicomDB.attachment.getAsStream(instance, 'object.dcm'));
+        const stream = await fastify.getDicomFileAsStream(instance, dicomDB);
+        reply.code(200).send(stream);
       }
     } catch (err) {
       reply.send(
@@ -376,77 +377,129 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('retrieveInstanceFrames', (request, reply) => {
-    // TODO:  this is just a non-working stuff for wado-rs frame retrieve
+  fastify.decorate('retrieveInstanceFrames', async (request, reply) => {
+    // wado-rs frame retrieve
     //
     // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_8.6.html#sect_8.6.1.2
     //
-    // Issues:
-    // - Need to accept frames as a comma separated list of frame numbers (starting at 1)
+    // - Accepts frames as a comma separated list of frame numbers (starting at 1):
     //   -- most likely/common use case will be a single number 1.  This is what OHIF requests.
     //   -- this means just skipping past the dicom header and returning just the PixelData.
     // - in general, need to skip to the correct frame location for each requested frame
-    //   -- need to figure offsets out from the instance metadata (maybe precalculate?)
-    //   -- need to do a range request to get the part of the attachment corresponding to the frame
+    //   -- need to figure offsets out from the instance metadata.
+    //   For attachments it makes a head call for attachment size and gets the document for the necessary header values, calculates the ofset and makes a range query
     //        Couchdb attachments can be accessed via ranges:
     //          http://docs.couchdb.org/en/stable/api/document/attachments.html#api-doc-attachment-range
-    //        Not clear how to do this via nano.
+    //        Not clear how to do this via nano. resolved with http range query for attachments for now
     //        Issue filed here: https://github.com/apache/couchdb-nano/issues/166
-    // - need to add the multipart header and content separators
+    //  For linked files it makes a stats call for the size, calculates the offset and makes a range read from the stream
+    // - Adds multipart header and content separators
     try {
+      const dicomDB = fastify.couch.db.use(config.db);
       const instance = request.params.instance || request.query.objectUID;
       const framesParam = request.params.frames || request.query.frame;
-      this.request = Axios.create({
-        baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
-      });
+      let doc = instance;
+      if (typeof instance === 'string') doc = await dicomDB.get(instance);
+      // get tags of the instance
+      const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
+      const numOfBits = doc.dataset['00280100'].Value[0];
+      const rows = doc.dataset['00280010'].Value[0];
+      const cols = doc.dataset['00280011'].Value[0];
+      const samplesForPixel = doc.dataset['00280002'].Value[0];
+      const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
+      let framePromises = [];
+      const frames = [];
+      if (doc.filePath)
+        framePromises = await fastify.retrieveInstanceFramesFromLink(doc, framesParam, {
+          numOfFrames,
+          numOfBits,
+          rows,
+          cols,
+          samplesForPixel,
+          frameSize,
+        });
+      else
+        framePromises = await fastify.retrieveInstanceFramesFromAttachment(doc, framesParam, {
+          numOfFrames,
+          numOfBits,
+          rows,
+          cols,
+          samplesForPixel,
+          frameSize,
+        });
+      // pack the frames in a multipart and send
+      const frameResponses = await Promise.all(framePromises);
+      frameResponses.forEach(response => frames.push(response));
 
-      // make a head query to get the attachment size
-      // TODO nano doesn't support db.attachment.head
-      this.request
-        .head(`/${instance}/object.dcm`)
-        .then(head => {
-          fastify.log.info(`Content length of the attachment is ${head.headers['content-length']}`);
-          const attachmentSize = Number(head.headers['content-length']);
+      const { data, boundary } = dcmjs.utilities.message.multipartEncode(
+        frames,
+        undefined,
+        'application/octet-stream'
+      );
+      try {
+        reply.headers({
+          'Content-Type': `multipart/related; application/octet-stream; boundary=${boundary}`,
+          maxContentLength: Buffer.byteLength(data) + 1,
+        });
+        reply.code(200).send(Buffer.from(data));
+      } catch (replyErr) {
+        reply.send(new InternalError('Packing frames', replyErr));
+      }
+    } catch (err) {
+      reply.send(
+        new ResourceNotFoundError('Frame', request.params.frames || request.query.frame, err)
+      );
+    }
+  });
 
-          // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
-          const dicomDB = fastify.couch.db.use(config.db);
-          dicomDB.get(instance, (err, doc) => {
-            if (err) reply.send(new InternalError('Get instance for frame retrieval', err));
-            else {
+  fastify.decorate(
+    'retrieveInstanceFramesFromAttachment',
+    (doc, framesParam, calcVars) =>
+      new Promise(async (resolve, reject) => {
+        try {
+          this.request = Axios.create({
+            baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
+          });
+          const id = doc.id ? doc.id : doc._id;
+          // make a head query to get the attachment size
+          // TODO nano doesn't support db.attachment.head
+          this.request
+            .head(`/${id}/object.dcm`)
+            .then(head => {
+              fastify.log.info(
+                `Content length of the attachment is ${head.headers['content-length']}`
+              );
+              const attachmentSize = Number(head.headers['content-length']);
+
               try {
-                // get tags of the instance
-                const numOfFrames = doc.dataset['00280008'] ? doc.dataset['00280008'].Value[0] : 1;
-                const numOfBits = doc.dataset['00280100'].Value[0];
-                const rows = doc.dataset['00280010'].Value[0];
-                const cols = doc.dataset['00280011'].Value[0];
-                const samplesForPixel = doc.dataset['00280002'].Value[0];
-                const frameSize = Math.ceil((rows * cols * numOfBits * samplesForPixel) / 8);
                 // TODO Number should be removed after IS is corrected
-                const headerSize = attachmentSize - frameSize * Number(numOfFrames);
+                const headerSize =
+                  attachmentSize - calcVars.frameSize * Number(calcVars.numOfFrames);
                 fastify.log.info(
-                  `numOfFrames: ${numOfFrames}, numOfBits: ${numOfBits}, rows : ${rows}, cols: ${cols}, samplesForPixel: ${samplesForPixel}, frameSize: ${frameSize}, headerSize: ${headerSize}`
+                  `numOfFrames: ${calcVars.numOfFrames}, numOfBits: ${calcVars.numOfBits}, rows : ${calcVars.rows}, cols: ${calcVars.cols}, samplesForPixel: ${calcVars.samplesForPixel}, frameSize: ${calcVars.frameSize}, headerSize: ${calcVars.headerSize}`
                 );
 
                 // get range from couch for each frame, just forward the url for now
                 // TODO update nano
-                const frames = [];
-                const framePromisses = [];
+                const framePromises = [];
                 const frameNums = framesParam.split(',');
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
                 frameNums.forEach(frameNum => {
                   const frameNo = Number(frameNum);
-                  const range = `bytes=${headerSize + frameSize * (frameNo - 1)}-${headerSize -
+                  // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+                  const range = `bytes=${headerSize +
+                    calcVars.frameSize * (frameNo - 1)}-${headerSize -
                     1 +
-                    frameSize * frameNo}`;
+                    calcVars.frameSize * frameNo}`;
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
-                  framePromisses.push(
-                    new Promise((resolve, reject) => {
+                  framePromises.push(
+                    new Promise((rangeResolve, rangeReject) => {
                       const opt = {
                         hostname: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
-                        path: `/${config.db}/${instance}/object.dcm`,
+                        path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
                         headers: { Range: range },
                       };
@@ -464,30 +517,30 @@ async function couchdb(fastify, options) {
                           });
                           res.on('end', () => {
                             const databuffer = Buffer.concat(data);
-                            resolve(databuffer);
+                            rangeResolve(databuffer);
                           });
                         } catch (e) {
-                          if (data.length === 0) reject(new Error('Empty buffer'));
+                          if (data.length === 0) rangeReject(new Error('Empty buffer'));
                           else {
                             const databuffer = Buffer.concat(data);
                             fastify.log.info(
                               `Threw error in catch. Error: ${e.message}, sending buffer of size 
                                ${databuffer.length} anyway`
                             );
-                            resolve(databuffer);
+                            rangeResolve(databuffer);
                           }
                         }
                       });
 
                       req.on('error', error => {
-                        if (data.length === 0) reject(new Error('Empty buffer'));
+                        if (data.length === 0) rangeReject(new Error('Empty buffer'));
                         else {
                           const databuffer = Buffer.concat(data);
                           fastify.log.info(
                             `Threw error ${error.message}, sending buffer of size 
                              ${databuffer.length} anyway`
                           );
-                          resolve(databuffer);
+                          rangeResolve(databuffer);
                         }
                       });
 
@@ -495,43 +548,64 @@ async function couchdb(fastify, options) {
                     })
                   );
                 });
-                // pack the frames in a multipart and send
-                Promise.all(framePromisses)
-                  .then(frameResponses => {
-                    frameResponses.forEach(response => frames.push(response));
-                    const { data, boundary } = dcmjs.utilities.message.multipartEncode(
-                      frames,
-                      undefined,
-                      'application/octet-stream'
-                    );
-                    try {
-                      reply.headers({
-                        'Content-Type': `multipart/related; application/octet-stream; boundary=${boundary}`,
-                        maxContentLength: Buffer.byteLength(data) + 1,
-                      });
-                      reply.code(200).send(Buffer.from(data));
-                    } catch (replyErr) {
-                      reply.send(new InternalError('Packing frames', replyErr));
-                    }
-                  })
-                  .catch(packErr => {
-                    reply.send(new InternalError('Pack error', packErr));
-                  });
+                resolve(framePromises);
               } catch (frameErr) {
-                reply.send(new InternalError('Not able to get frame', frameErr));
+                reject(new InternalError('Not able to get frame', frameErr));
               }
+            })
+            .catch(err => {
+              reject(new InternalError(`Couldn't get content length for the attachment`, err));
+            });
+        } catch (err) {
+          reject(new ResourceNotFoundError('Frame', framesParam, err));
+        }
+      })
+  );
+
+  fastify.decorate(
+    'retrieveInstanceFramesFromLink',
+    (doc, framesParam, calcVars) =>
+      new Promise(async (resolve, reject) => {
+        try {
+          const fileSize = fs.statSync(doc.filePath).size;
+
+          // TODO Number should be removed after IS is corrected
+          const headerSize = fileSize - calcVars.frameSize * Number(calcVars.numOfFrames);
+          fastify.log.info(
+            `numOfFrames: ${calcVars.numOfFrames}, numOfBits: ${calcVars.numOfBits}, rows : ${calcVars.rows}, cols: ${calcVars.cols}, samplesForPixel: ${calcVars.samplesForPixel}, frameSize: ${calcVars.frameSize}, headerSize: ${headerSize}`
+          );
+
+          fs.open(doc.filePath, 'r', (error, fd) => {
+            if (error) {
+              reject(new InternalError('Opening linked DICOM file', error));
             }
+            // get range from couch for each frame, just forward the url for now
+            // TODO update nano
+            const framePromises = [];
+            const frameNums = framesParam.split(',');
+            fastify.log.info(`frameNums that are sent : ${frameNums}`);
+            frameNums.forEach(frameNum => {
+              const frameNo = Number(frameNum);
+              // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
+              const offset = headerSize + calcVars.frameSize * (frameNo - 1);
+              fastify.log.info(`headerSize: ${headerSize}, frameNo: ${frameNo}, offset: ${offset}`);
+              const buffer = Buffer.alloc(calcVars.frameSize);
+              framePromises.push(
+                new Promise((rangeResolve, rangeReject) => {
+                  fs.read(fd, buffer, 0, calcVars.frameSize, offset, (err, __, databuffer) => {
+                    if (err) rangeReject(new InternalError('Reading frame buffer', err));
+                    rangeResolve(databuffer);
+                  });
+                })
+              );
+            });
+            resolve(framePromises);
           });
-        })
-        .catch(err => {
-          reply.send(new InternalError(`Couldn't get content length for the attachment`, err));
-        });
-    } catch (err) {
-      reply.send(
-        new ResourceNotFoundError('Frame', request.params.frames || request.query.frame, err)
-      );
-    }
-  });
+        } catch (err) {
+          reject(new ResourceNotFoundError('Frame', framesParam, err));
+        }
+      })
+  );
 
   fastify.decorate('getStudyMetadata', (request, reply) => {
     try {
@@ -648,7 +722,7 @@ async function couchdb(fastify, options) {
     return fastify.saveBuffer(arrayBuffer);
   });
 
-  fastify.decorate('saveBuffer', (arrayBuffer, dicomDB) => {
+  fastify.decorate('saveBuffer', (arrayBuffer, dicomDB, filePath) => {
     // eslint-disable-next-line no-param-reassign
     if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
     // TODO: Check if this needs to be Buffer or not.
@@ -660,6 +734,7 @@ async function couchdb(fastify, options) {
       dataset: dicomData.dict,
       md5hash: incomingMd5,
     };
+    if (filePath) couchDoc.filePath = filePath;
     return new Promise((resolve, reject) =>
       dicomDB.get(couchDoc._id, (error, existing) => {
         if (!error) {
@@ -667,7 +742,11 @@ async function couchdb(fastify, options) {
           // old documents won't have md5
           if (existing.md5hash) {
             // get the md5 of the buffer
-            if (existing.md5hash === incomingMd5) {
+            if (
+              existing.md5hash === incomingMd5 && // same md5
+              ((filePath && existing.filePath && existing.filePath === filePath) || // filepath sent (saving as a link) and it was saved as a link to same path before
+                (!filePath && !existing.filePath)) // no filepath (saving as attachment) and it wasn't saved as a link before
+            ) {
               fastify.log.info(`${couchDoc._id} is already in the system with same hash`);
               resolve('File already in system');
               return;
@@ -680,25 +759,154 @@ async function couchdb(fastify, options) {
           if (err) {
             reject(err);
           }
-
-          dicomDB.attachment.insert(
-            couchDoc._id,
-            'object.dcm',
-            body,
-            'application/dicom',
-            { rev: data.rev },
-            attachmentErr => {
-              if (attachmentErr) {
-                reject(attachmentErr);
+          if (!filePath)
+            dicomDB.attachment.insert(
+              couchDoc._id,
+              'object.dcm',
+              body,
+              'application/dicom',
+              { rev: data.rev },
+              attachmentErr => {
+                if (attachmentErr) {
+                  reject(attachmentErr);
+                }
+                resolve('Saving successful');
               }
-
-              resolve('Saving successful');
-            }
-          );
+            );
+          else resolve('Saving successful');
         });
       })
     );
   });
+
+  fastify.decorate(
+    'processFolder',
+    (linkDir, dicomDB) =>
+      new Promise((resolve, reject) => {
+        fastify.log.info(`Processing folder ${linkDir}`);
+        // success variable is to check if there was at least one successful processing
+        const result = { success: false, errors: [] };
+        fs.readdir(linkDir, async (err, files) => {
+          if (err) {
+            reject(new InternalError(`Reading directory ${linkDir}`, err));
+          } else {
+            try {
+              const promises = [];
+              for (let i = 0; i < files.length; i += 1) {
+                if (files[i] !== '__MACOSX')
+                  if (fs.statSync(`${linkDir}/${files[i]}`).isDirectory() === true)
+                    try {
+                      // eslint-disable-next-line no-await-in-loop
+                      const subdirResult = await fastify.processFolder(
+                        `${linkDir}/${files[i]}`,
+                        dicomDB
+                      );
+                      if (subdirResult && subdirResult.errors && subdirResult.errors.length > 0) {
+                        result.errors = result.errors.concat(subdirResult.errors);
+                      }
+                      if (subdirResult && subdirResult.success) {
+                        result.success = result.success || subdirResult.success;
+                      }
+                    } catch (folderErr) {
+                      reject(folderErr);
+                    }
+                  else
+                    promises.push(() => {
+                      return (
+                        fastify
+                          .processFile(linkDir, files[i], dicomDB)
+                          // eslint-disable-next-line no-loop-func
+                          .catch(error => {
+                            result.errors.push(error);
+                          })
+                      );
+                    });
+              }
+              fastify.dbPqueue.addAll(promises).then(async values => {
+                try {
+                  for (let i = 0; values.length; i += 1) {
+                    if (
+                      values[i] === undefined ||
+                      (values[i].errors && values[i].errors.length === 0)
+                    ) {
+                      // one success is enough
+                      result.success = result.success || true;
+                      break;
+                    }
+                  }
+                  resolve(result);
+                } catch (saveDicomErr) {
+                  reject(saveDicomErr);
+                }
+              });
+            } catch (errDir) {
+              reject(errDir);
+            }
+          }
+        });
+      })
+  );
+
+  fastify.decorate(
+    'processFile',
+    (dir, filename, dicomDB) =>
+      new Promise((resolve, reject) => {
+        try {
+          let buffer = [];
+          const readableStream = fs.createReadStream(`${dir}/${filename}`);
+          readableStream.on('data', chunk => {
+            buffer.push(chunk);
+          });
+          readableStream.on('error', readErr => {
+            fastify.log.error(`Error in save when reading file ${dir}/${filename}: ${readErr}`);
+            reject(new InternalError(`Reading file ${dir}/${filename}`, readErr));
+          });
+          readableStream.on('close', () => {
+            readableStream.destroy();
+          });
+          readableStream.on('end', async () => {
+            buffer = Buffer.concat(buffer);
+            try {
+              const arrayBuffer = toArrayBuffer(buffer);
+              await fastify.saveBuffer(arrayBuffer, dicomDB, `${dir}/${filename}`);
+              resolve({ success: true, errors: [] });
+            } catch (err) {
+              fastify.log.warn(`File not supported ignoring ${filename}`);
+              resolve({ success: true, errors: [] });
+            }
+          });
+        } catch (err) {
+          reject(new InternalError(`Processing file ${filename}`, err));
+        }
+      })
+  );
+
+  fastify.decorate('linkFolder', async (request, reply) => {
+    try {
+      if (request.req.hostname.startsWith('localhost')) {
+        const dicomDB = fastify.couch.db.use(config.db);
+        const result = await fastify.processFolder(request.query.path, dicomDB);
+        if (result.success) {
+          fastify.log.info(`Folder ${request.query.path} linked successfully`);
+          reply.code(200).send('success');
+        } else {
+          reply.send(new InternalError('linkFolder', new Error(JSON.stringify(result.errors))));
+        }
+      } else {
+        reply.send(
+          new BadRequestError(
+            'Not supported',
+            new Error('Linkfolder functionality is only supported for localhost')
+          )
+        );
+      }
+    } catch (e) {
+      // TODO Proper error reporting implementation required
+      // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
+      reply.send(new InternalError('linkFolder', e));
+    }
+  });
+
   fastify.decorate('stow', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
@@ -819,6 +1027,17 @@ async function couchdb(fastify, options) {
     }
   });
 
+  fastify.decorate('getDicomFileAsStream', async (instance, dicomDB) => {
+    let doc = instance;
+    if (typeof instance === 'string') doc = await dicomDB.get(instance);
+    if (doc.filePath) {
+      return fs.createReadStream(doc.filePath);
+    }
+    // if the document is retrieved via metadata the id is in id, if document retrieved it is _id
+    const id = doc.id ? doc.id : doc._id;
+    return dicomDB.attachment.getAsStream(id, 'object.dcm');
+  });
+
   fastify.decorate('getWado', (request, reply) => {
     try {
       // get the datasets
@@ -845,15 +1064,16 @@ async function couchdb(fastify, options) {
         filterOptions = {
           startkey: [myParams.study, myParams.series, ''],
           endkey: [myParams.studyEnd, myParams.seriesEnd, '{}'],
+          reduce: false,
+          include_docs: true,
         };
-        dicomDB.view('instances', 'wado_metadata', filterOptions, async (error, body) => {
+
+        dicomDB.view('instances', 'qido_instances', filterOptions, async (error, body) => {
           if (!error) {
             try {
               const datasetsReqs = [];
-              body.rows.forEach(async instance => {
-                datasetsReqs.push(
-                  fastify.getDicom(dicomDB.attachment.getAsStream(instance.id, 'object.dcm'))
-                );
+              body.rows.forEach(instance => {
+                datasetsReqs.push(fastify.getDicomBuffer(instance.doc, dicomDB));
               });
               const datasets = await Promise.all(datasetsReqs);
               const { data, boundary } = await fastify.packMultipartDicomsInternal(datasets);
@@ -901,10 +1121,11 @@ async function couchdb(fastify, options) {
   );
 
   fastify.decorate(
-    'getDicom',
-    stream =>
+    'getDicomBuffer',
+    (instance, dicomDB) =>
       new Promise(async (resolve, reject) => {
         try {
+          const stream = await fastify.getDicomFileAsStream(instance, dicomDB);
           const bufs = [];
           stream.on('data', d => {
             bufs.push(d);
@@ -918,6 +1139,13 @@ async function couchdb(fastify, options) {
         }
       })
   );
+
+  fastify.addHook('onError', (request, reply, error, done) => {
+    if (error instanceof ResourceNotFoundError) reply.code(404);
+    else if (error instanceof InternalError) reply.code(500);
+    else if (error instanceof BadRequestError) reply.code(400);
+    done();
+  });
 
   fastify.log.info(`Using db: ${config.db}`);
   // register couchdb

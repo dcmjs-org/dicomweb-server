@@ -15,6 +15,22 @@ async function stowRoutes(fastify) {
     },
     handler: fastify.stow,
   });
+
+  fastify.route({
+    method: 'POST',
+    url: '/linkFolder',
+    schema: {
+      query: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+          },
+        },
+      },
+    },
+    handler: fastify.linkFolder,
+  });
 }
 
 module.exports = stowRoutes;
