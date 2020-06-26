@@ -20,7 +20,7 @@ module.exports = function buildResponse(dataset, fields) {
 	    }
 	} else {
 		for (var t in dataset) {
-	        val = returnValueFromVR(dataset, dataset[t], t, dataset[t].vr);
+	        val = returnValueFromVR(dataset, dataset[t], t, dataset[t].vr, false, true);
 
 	        if (val) {
 	        	response[t] = val;	
