@@ -317,6 +317,7 @@ async function couchdb(fastify, options) {
           endkey: [`${request.params.study}\u9999`, '{}'],
           reduce: true,
           group_level: 3,
+          stale: 'update_after',
         },
         (error, body) => {
           if (!error) {
@@ -363,6 +364,7 @@ async function couchdb(fastify, options) {
           reduce: true,
           group: true,
           group_level: 4,
+          stale: 'update_after',
         },
         (error, body) => {
           if (!error) {
