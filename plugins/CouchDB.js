@@ -192,7 +192,7 @@ async function couchdb(fastify, options) {
             // ...dbfilter,
             reduce: true,
             group_level: 4,
-            stale: 'update_after',
+            stale: 'ok',
           },
           (error, body) => {
             if (!error) {
@@ -317,7 +317,7 @@ async function couchdb(fastify, options) {
           endkey: [`${request.params.study}\u9999`, '{}'],
           reduce: true,
           group_level: 3,
-          stale: 'update_after',
+          stale: 'ok',
         },
         (error, body) => {
           if (!error) {
@@ -364,7 +364,7 @@ async function couchdb(fastify, options) {
           reduce: true,
           group: true,
           group_level: 4,
-          stale: 'update_after',
+          stale: 'ok',
         },
         (error, body) => {
           if (!error) {
@@ -939,6 +939,15 @@ async function couchdb(fastify, options) {
       reply.send(new InternalError('linkFolder', e));
     }
   });
+  fastify.decorate('updateViews', dicomDB => {
+    // trigger view updates
+    const updateViewPromisses = [];
+    updateViewPromisses.push(dicomDB.view('instances', 'qido_study', {}));
+    updateViewPromisses.push(dicomDB.view('instances', 'qido_series', {}));
+    updateViewPromisses.push(dicomDB.view('instances', 'qido_instances', {}));
+    // I don't need to wait
+    fastify.dbPqueue.addAll(updateViewPromisses);
+  });
 
   fastify.decorate('stow', (request, reply) => {
     try {
@@ -955,6 +964,7 @@ async function couchdb(fastify, options) {
       fastify.dbPqueue
         .addAll(promises)
         .then(() => {
+          fastify.updateViews();
           fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
         })
@@ -1003,6 +1013,7 @@ async function couchdb(fastify, options) {
                   });
               });
             });
+            fastify.updateViews();
             fastify.log.info(`Deleted study ${request.params.study} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
           }
@@ -1047,7 +1058,7 @@ async function couchdb(fastify, options) {
                   });
               });
             });
-
+            fastify.updateViews();
             fastify.log.info(`Deleted series ${request.params.series} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
           }
