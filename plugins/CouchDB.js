@@ -942,9 +942,15 @@ async function couchdb(fastify, options) {
   fastify.decorate('updateViews', dicomDB => {
     // trigger view updates
     const updateViewPromisses = [];
-    updateViewPromisses.push(dicomDB.view('instances', 'qido_study', {}));
-    updateViewPromisses.push(dicomDB.view('instances', 'qido_series', {}));
-    updateViewPromisses.push(dicomDB.view('instances', 'qido_instances', {}));
+    updateViewPromisses.push(() => {
+      return dicomDB.view('instances', 'qido_study', {});
+    });
+    updateViewPromisses.push(() => {
+      return dicomDB.view('instances', 'qido_series', {});
+    });
+    updateViewPromisses.push(() => {
+      return dicomDB.view('instances', 'qido_instances', {});
+    });
     // I don't need to wait
     fastify.dbPqueue.addAll(updateViewPromisses);
   });
@@ -964,7 +970,7 @@ async function couchdb(fastify, options) {
       fastify.dbPqueue
         .addAll(promises)
         .then(() => {
-          fastify.updateViews();
+          fastify.updateViews(dicomDB);
           fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
         })
@@ -1013,7 +1019,7 @@ async function couchdb(fastify, options) {
                   });
               });
             });
-            fastify.updateViews();
+            fastify.updateViews(dicomDB);
             fastify.log.info(`Deleted study ${request.params.study} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
           }
@@ -1058,7 +1064,7 @@ async function couchdb(fastify, options) {
                   });
               });
             });
-            fastify.updateViews();
+            fastify.updateViews(dicomDB);
             fastify.log.info(`Deleted series ${request.params.series} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
           }
