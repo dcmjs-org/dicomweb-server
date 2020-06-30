@@ -471,7 +471,7 @@ async function couchdb(fastify, options) {
                           else {
                             const databuffer = Buffer.concat(data);
                             fastify.log.info(
-                              `Threw error in catch. Error: ${e.message}, sending buffer of size 
+                              `Threw error in catch. Error: ${e.message}, sending buffer of size
                                ${databuffer.length} anyway`
                             );
                             resolve(databuffer);
@@ -484,7 +484,7 @@ async function couchdb(fastify, options) {
                         else {
                           const databuffer = Buffer.concat(data);
                           fastify.log.info(
-                            `Threw error ${error.message}, sending buffer of size 
+                            `Threw error ${error.message}, sending buffer of size
                              ${databuffer.length} anyway`
                           );
                           resolve(databuffer);
@@ -699,6 +699,48 @@ async function couchdb(fastify, options) {
       })
     );
   });
+
+  fastify.decorate('processBufferWithoutAttachingPart10', (arrayBuffer, dicomDB) => {
+    // eslint-disable-next-line no-param-reassign
+    if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
+    // TODO: Check if this needs to be Buffer or not.
+    const body = Buffer.from(arrayBuffer);
+    const incomingMd5 = md5(body);
+    const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
+    const couchDoc = {
+      _id: dicomData.dict['00080018'].Value[0],
+      dataset: dicomData.dict,
+      md5hash: incomingMd5,
+    };
+    return new Promise((resolve, reject) =>
+      dicomDB.get(couchDoc._id, (error, existing) => {
+        if (!error) {
+          couchDoc._rev = existing._rev;
+          // old documents won't have md5
+          if (existing.md5hash) {
+            // get the md5 of the buffer
+            if (existing.md5hash === incomingMd5) {
+              fastify.log.info(`${couchDoc._id} is already in the system with same hash`);
+              resolve('File already in system');
+              return;
+            }
+          }
+          fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
+        }
+
+        dicomDB.insert(couchDoc, err => {
+          if (err) {
+            reject(err);
+
+            return;
+          }
+
+          resolve('Saving successful');
+        });
+      })
+    );
+  });
+
   fastify.decorate('stow', (request, reply) => {
     try {
       const dicomDB = fastify.couch.db.use(config.db);
@@ -727,6 +769,33 @@ async function couchdb(fastify, options) {
       // TODO Proper error reporting implementation required
       // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
       reply.send(new InternalError('STOW', e));
+    }
+  });
+
+  fastify.decorate('storeMetadata', (request, reply) => {
+    try {
+      const dicomDB = fastify.couch.db.use(config.db);
+      const res = toArrayBuffer(request.body);
+      const parts = dcmjs.utilities.message.multipartDecode(res);
+      const promises = [];
+      for (let i = 0; i < parts.length; i += 1) {
+        const arrayBuffer = parts[i];
+        promises.push(() => {
+          return fastify.processBufferWithoutAttachingPart10(arrayBuffer, dicomDB);
+        });
+      }
+      fastify.dbPqueue
+        .addAll(promises)
+        .then(() => {
+          fastify.log.info(`storeMetadata is done successfully`);
+          reply.code(200).send('storeMetadata success');
+        })
+        .catch(err => {
+          fastify.log.error(`Error in storeMetadata: ${err}`);
+          reply.send(new InternalError('storeMetadata save', err));
+        });
+    } catch (e) {
+      reply.send(new InternalError('storeMetadata', e));
     }
   });
 

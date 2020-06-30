@@ -82,6 +82,7 @@ fastify.register(require('./routes/qido'), { prefix: config.prefix }); // eslint
 fastify.register(require('./routes/wado'), { prefix: config.prefix }); // eslint-disable-line global-require
 fastify.register(require('./routes/stow'), { prefix: config.prefix }); // eslint-disable-line global-require
 fastify.register(require('./routes/other'), { prefix: config.prefix }); // eslint-disable-line global-require
+fastify.register(require('./routes/storeMetadata'), { prefix: config.prefix }); // eslint-disable-line global-require
 
 // authCheck routine checks if there is a bearer token or encoded basic authentication
 // info in the authorization header and does the authentication or verification of token

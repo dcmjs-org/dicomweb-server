@@ -11,7 +11,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ohif/dicomweb-server:latest
+    image: ohif/dicomweb-server:test
     hostname: dicomweb-server
     environment:
       - PORT=5984
