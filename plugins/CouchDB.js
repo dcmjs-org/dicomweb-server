@@ -313,8 +313,8 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_series',
         {
-          startkey: [request.params.study, ''],
-          endkey: [`${request.params.study}\u9999`, '{}'],
+          startkey: [request.params.study],
+          endkey: [request.params.study, {}, {}],
           reduce: true,
           group_level: 3,
           stale: 'ok',
@@ -359,8 +359,8 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_instances',
         {
-          startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
+          startkey: [request.params.study, request.params.series],
+          endkey: [request.params.study, request.params.series, {}],
           reduce: true,
           group: true,
           group_level: 4,
@@ -646,8 +646,8 @@ async function couchdb(fastify, options) {
         'instances',
         'wado_metadata',
         {
-          startkey: [request.params.study, '', ''],
-          endkey: [`${request.params.study}\u9999`, {}, {}],
+          startkey: [request.params.study],
+          endkey: [request.params.study, {}, {}],
         },
         (error, body) => {
           if (!error) {
@@ -674,8 +674,8 @@ async function couchdb(fastify, options) {
         'instances',
         'wado_metadata',
         {
-          startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, {}],
+          startkey: [request.params.study, request.params.series],
+          endkey: [request.params.study, request.params.series, {}],
         },
         (error, body) => {
           if (!error) {
@@ -996,8 +996,8 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_instances',
         {
-          startkey: [request.params.study, '', ''],
-          endkey: [`${request.params.study}\u9999`, '{}', '{}'],
+          startkey: [request.params.study],
+          endkey: [request.params.study, {}, {}],
           reduce: false,
           include_docs: true,
         },
@@ -1041,8 +1041,8 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_instances',
         {
-          startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
+          startkey: [request.params.study, request.params.series],
+          endkey: [request.params.study, request.params.series, {}],
           reduce: false,
           include_docs: true,
         },
@@ -1095,31 +1095,27 @@ async function couchdb(fastify, options) {
       // get the datasets
       const dicomDB = fastify.couch.db.use(config.db);
       let isFiltered = false;
-      const myParams = request.params;
-      if (!request.params.series) {
-        myParams.series = '';
-        myParams.seriesEnd = '{}';
-        if (!request.params.study) {
-          myParams.study = '';
-          myParams.studyEnd = '{}';
-        } else {
-          myParams.studyEnd = `${request.params.study}\u9999`;
-          isFiltered = true;
-        }
-      } else {
-        myParams.seriesEnd = `${request.params.series}\u9999`;
-        myParams.studyEnd = request.params.study;
+      const startKey = [];
+      const endKey = [];
+      if (request.params.study) {
+        startKey.push(request.params.study);
+        endKey.push(request.params.study);
         isFiltered = true;
       }
+      if (request.params.series) {
+        startKey.push(request.params.series);
+        endKey.push(request.params.series);
+        isFiltered = true;
+      }
+      for (let i = endKey.length; i < 3; i += 1) endKey.push({});
       let filterOptions = {};
       if (isFiltered) {
         filterOptions = {
-          startkey: [myParams.study, myParams.series, ''],
-          endkey: [myParams.studyEnd, myParams.seriesEnd, '{}'],
+          startkey: startKey,
+          endkey: endKey,
           reduce: false,
           include_docs: true,
         };
-
         dicomDB.view('instances', 'qido_instances', filterOptions, async (error, body) => {
           if (!error) {
             try {
