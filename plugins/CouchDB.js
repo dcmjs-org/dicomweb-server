@@ -939,7 +939,9 @@ async function couchdb(fastify, options) {
       reply.send(new InternalError('linkFolder', e));
     }
   });
-  fastify.decorate('updateViews', dicomDB => {
+  fastify.decorate('updateViews', dbConn => {
+    let dicomDB = dbConn;
+    if (!dicomDB) dicomDB = fastify.couch.db.use(config.db);
     // trigger view updates
     const updateViewPromisses = [];
     updateViewPromisses.push(() => {
@@ -1208,6 +1210,8 @@ async function couchdb(fastify, options) {
   fastify.after(async () => {
     try {
       await fastify.init();
+      // update views on startup
+      fastify.updateViews();
     } catch (err) {
       fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
       fastify.close();
