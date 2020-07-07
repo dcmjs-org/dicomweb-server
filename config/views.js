@@ -1,5 +1,4 @@
 const wado = require('./wado.js');
-const qidoStudySeries = require('./qido_study_series.js');
 const qidoStudy = require('./qido_study.js');
 const qidoSeries = require('./qido_series.js');
 const qidoInstances = require('./qido_instances.js');
@@ -8,10 +7,12 @@ const buildResponse = require('./buildResponse');
 const returnValueFromVR = require('./returnValueFromVR');
 const btoa = require('./btoa');
 const getBulkDataURI = require('./getBulkDataURI');
+const tags = require('./viewTags');
 
-function stringifyViewWithDependencies(func) {
+function stringifyViewWithDependencies(func, tags2put) {
   return `
     function(doc) {
+        ${tags2put ? `var ${tags2put} = ${JSON.stringify(tags[tags2put])};` : ''}
         ${btoa.toString()}
         ${getBulkDataURI.toString()}
         ${returnValueFromVR.toString()}
@@ -28,23 +29,19 @@ module.exports.views = {
     map: stringifyViewWithDependencies(wado),
   },
   patients: {
-    map: stringifyViewWithDependencies(patients),
-    reduce: '_count()',
-  },
-  qido_study_series: {
-    map: stringifyViewWithDependencies(qidoStudySeries),
-    reduce: '_count()',
+    map: stringifyViewWithDependencies(patients, 'patientTags'),
+    reduce: '_count',
   },
   qido_study: {
-    map: stringifyViewWithDependencies(qidoStudy),
-    reduce: '_count()',
+    map: stringifyViewWithDependencies(qidoStudy, 'studyTags'),
+    reduce: '_count',
   },
   qido_series: {
-    map: stringifyViewWithDependencies(qidoSeries),
-    reduce: '_count()',
+    map: stringifyViewWithDependencies(qidoSeries, 'seriesTags'),
+    reduce: '_count',
   },
   qido_instances: {
-    map: stringifyViewWithDependencies(qidoInstances),
-    reduce: '_count()',
+    map: stringifyViewWithDependencies(qidoInstances, 'instanceTags'),
+    reduce: '_count',
   },
 };

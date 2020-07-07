@@ -1,25 +1,10 @@
 /* eslint-disable */
 var buildResponse = require('./buildResponse');
+var { instanceTags } = require('./viewTags');
 
 module.exports = function applyView(doc) {
-    var tags = [
-        ['charset', '00080005', '', 'CS', 1],
-        ['SOPClassUID', '00080016', '', 'UI', 1],
-        ['SOPInstanceUID', '00080018', '', 'UI', 1],
-        ['instanceAvailability', '00080056', '', 'CS', 1],
-        ['timezoneOffsetFromUTC', '00080201', '', 'SH', 0],
-        ['retrieveURL', '00081190', '', 'UR', 1],
-        ['instanceNumber', '00200013', '', 'IS', 1],
-        ['rows', '00280010', '', 'US', 0],
-        ['columns', '00280011', '', 'US', 0],
-        ['bitsAllocated', '00280100', '', 'US', 0],
-        ['numberOfFrames', '00280008', '', 'IS', 0],
-        ['studyUID', '0020000D', '', 'UI', 1],
-        ['seriesUID', '0020000E', '', 'UI', 1],
-        ['retrieveAETitle', '00080054', '', 'AE', 1]
-    ];
-
-    var key = buildResponse(doc.dataset, tags);
+    
+    var key = buildResponse(doc.dataset, instanceTags);
     var studyUID = 'NA';
     var seriesUID = 'NA';
     var instanceUID = 'NA';
@@ -36,5 +21,5 @@ module.exports = function applyView(doc) {
         instanceUID = doc.dataset['00080018'].Value[0];
     }
 
-    emit([studyUID, seriesUID, instanceUID, key], 1)
+    emit([studyUID, seriesUID, instanceUID, JSON.stringify([key['00080005'],key['00080016'],key['00080018'],key['00080056'],key['00080201'],key['00081190'],key['00200013'],key['00280010'],key['00280011'],key['00280100'],key['00280008'],key['0020000D'],key['0020000E'],key['00080054']])], null)
 }

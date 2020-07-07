@@ -198,7 +198,6 @@ describe('WADO Tests', () => {
 
           return;
         }
-
         expect(res.statusCode).to.equal(200);
         expect(res.body[0]['00080018'].Value[0]).to.be.eql(
           '1.3.6.1.4.1.14519.5.2.1.1706.4996.101091068805920483719105146694'

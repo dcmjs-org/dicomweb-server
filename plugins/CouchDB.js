@@ -12,6 +12,7 @@ const md5 = require('md5');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
+const { studyTags, seriesTags, instanceTags, patientTags } = require('../config/viewTags');
 const { InternalError, ResourceNotFoundError, BadRequestError } = require('../utils/Errors');
 
 async function couchdb(fastify, options) {
@@ -92,6 +93,62 @@ async function couchdb(fastify, options) {
     return true;
   });
 
+  // get the values from couchdb and format the object with and according to VRs
+  fastify.decorate('formatValuesWithVR', (values, tags) => {
+    try {
+      const arr = JSON.parse(values);
+      const result = {};
+      for (let j = 0; j < tags.length; j += 1) {
+        result[tags[j][1]] = { vr: tags[j][3] };
+
+        // if (arr[j]) newobj[tags[j][1]].Value = [arr[j]];
+        const Value = arr[j];
+        switch (tags[j][3]) {
+          case 'PN':
+            if (Value && Value[0]) {
+              result[tags[j][1]].Value = [
+                {
+                  Alphabetic: Value[0],
+                },
+              ];
+            }
+
+            break;
+          case 'UN':
+            // TODO: Not sure what the actual limit should be,
+            // but dcm4chee will use BulkDataURI if the Value
+            // is too large. We should do the same
+            if (Value.startsWith('http') || Value.startsWith('/studies')) {
+              result[tags[j][1]].BulkDataURI = Value;
+            } else {
+              result[tags[j][1]].InlineBinary = Value;
+            }
+
+            break;
+          case 'OW':
+            result[tags[j][1]].BulkDataURI = Value;
+            break;
+          default:
+            if (
+              Value &&
+              Value.length &&
+              !(Value.length === 1 && (Value[0] === undefined || Value[0] === ''))
+            ) {
+              result[tags[j][1]].Value = Value;
+            }
+        }
+      }
+      return result;
+    } catch (err) {
+      fastify.log.error(
+        `Couldn't format Values With VR ${err.message}. Values: ${JSON.stringify(
+          values
+        )} Tags: ${JSON.stringify(tags)}`
+      );
+    }
+    return {};
+  });
+
   // needs to support query with following keys
   // StudyDate 00080020
   // StudyTime 00080030
@@ -121,48 +178,21 @@ async function couchdb(fastify, options) {
       };
 
       const dicomDB = fastify.couch.db.use(config.db);
-
-      const bodySeriesInfo = new Promise((resolve, reject) => {
-        dicomDB.view(
-          'instances',
-          'qido_study_series',
-          {
-            reduce: true,
-            group_level: 3,
-          },
-          (error, body) => {
-            if (!error) {
-              const seriesCounts = {};
-              const seriesModalities = {};
-              body.rows.forEach(study => {
-                if (!(study.key[0] in seriesCounts)) {
-                  seriesCounts[study.key[0]] = 0;
-                }
-
-                seriesCounts[study.key[0]] += 1;
-
-                if (!(study.key[0] in seriesModalities)) {
-                  seriesModalities[study.key[0]] = [];
-                }
-                // we should make sure each modality is referenced once
-                if (!seriesModalities[study.key[0]].includes(study.key[1]))
-                  seriesModalities[study.key[0]].push(study.key[1]);
-              });
-              resolve({ count: seriesCounts, modalities: seriesModalities });
-            } else {
-              reject(error);
-            }
-          }
-        );
-      });
-
+      // const dbfilter = request.query.PatientID
+      //   ? {
+      //       startkey: [request.query.PatientID, '', '', '', ''],
+      //       endkey: [`${request.query.PatientID}\u9999`, '{}', '{}', '{}', '{}'],
+      //     }
+      //   : {};
       const bodyStudies = new Promise((resolve, reject) => {
         dicomDB.view(
           'instances',
           'qido_study',
           {
+            // ...dbfilter,
             reduce: true,
-            group_level: 2,
+            group_level: 4,
+            stale: 'ok',
           },
           (error, body) => {
             if (!error) {
@@ -174,67 +204,66 @@ async function couchdb(fastify, options) {
         );
       });
 
-      Promise.all([bodySeriesInfo, bodyStudies])
+      bodyStudies
         .then(values => {
           const studies = {};
-          studies.rows = _.filter(values[1].rows, obj =>
-            fastify.queryObj(request.query, obj.key[1], queryKeys)
-          );
+          studies.rows = values.rows;
           const res = [];
           // couch returns ordered list, merge if the study occurs multiple times consequently (due to seres listing different tags)
           for (let i = 0; i < studies.rows.length; i += 1) {
             const study = studies.rows[i];
-            const studySeriesObj = study.key[1];
-
+            const newobj = fastify.formatValuesWithVR(study.key[3], studyTags);
             // add numberOfStudyRelatedInstances
-            studySeriesObj['00201208'].Value = [];
-            studySeriesObj['00201208'].Value.push(study.value);
+            newobj['00201208'].Value = [];
+            newobj['00201208'].Value.push(study.value);
             // add numberOfStudyRelatedSeries
-            studySeriesObj['00201206'].Value = [];
-            studySeriesObj['00201206'].Value.push(values[0].count[study.key[0]]);
+            newobj['00201206'].Value = [];
+            newobj['00201206'].Value.push(1);
+            newobj['00080061'].Value = [study.key[1]];
 
-            // add modalities
-            // TODO needs to be filtered by query
-            // ModalitiesInStudy 00080061
-            if (
-              request.query.ModalitiesInStudy &&
-              !values[0].modalities[study.key[0]].includes(request.query.ModalitiesInStudy)
-            )
-              // eslint-disable-next-line no-continue
-              continue;
-            studySeriesObj['00080061'].Value = values[0].modalities[study.key[0]];
+            study.key[3] = newobj;
+          }
 
-            // see if there are consequent records with the same studyuid
-            const currentStudyUID = study.key[0];
-            for (let j = i + 1; j < studies.rows.length; j += 1) {
-              const consequentStudyUID = studies.rows[j].key[0];
-              if (currentStudyUID === consequentStudyUID) {
-                // same study merge
-                const consequentStudySeriesObj = studies.rows[j].key[1];
-                Object.keys(consequentStudySeriesObj).forEach(tag => {
-                  if (tag === '00201208') {
-                    // numberOfStudyRelatedInstances needs to be cumulated
-                    studySeriesObj['00201208'].Value[0] += studies.rows[j].value;
-                  } else if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
-                    if (consequentStudySeriesObj[tag].Value)
-                      consequentStudySeriesObj[tag].Value.forEach(val => {
-                        if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [val];
-                        else if (
-                          // if both studies have values, cumulate them but don't make duplicates
-                          (typeof studySeriesObj[tag].Value[0] === 'string' &&
-                            !studySeriesObj[tag].Value.includes(val)) ||
-                          !_.findIndex(studySeriesObj[tag].Value, val) === -1
-                        ) {
-                          studySeriesObj[tag].Value.push(val);
-                        }
-                      });
-                  }
-                });
-                // skip the consequent study entries
-                i = j;
+          for (let i = 0; i < studies.rows.length; i += 1) {
+            const study = studies.rows[i];
+            const studySeriesObj = study.key[3];
+            if (fastify.queryObj(request.query, studySeriesObj, queryKeys)) {
+              // see if there are consequent records with the same studyuid
+              const currentStudyUID = study.key[0];
+              for (let j = i + 1; j < studies.rows.length; j += 1) {
+                const consequentStudyUID = studies.rows[j].key[0];
+                if (currentStudyUID === consequentStudyUID) {
+                  // same study merge
+                  const consequentStudySeriesObj = studies.rows[j].key[3];
+                  Object.keys(consequentStudySeriesObj).forEach(tag => {
+                    if (tag === '00201208') {
+                      // numberOfStudyRelatedInstances needs to be cumulated
+                      studySeriesObj['00201208'].Value[0] += studies.rows[j].value;
+                    } else if (tag === '00201206') {
+                      // numberOfStudyRelatedSeries needs to be cumulated
+                      studySeriesObj['00201206'].Value[0] +=
+                        consequentStudySeriesObj['00201206'].Value[0];
+                    } else if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
+                      if (consequentStudySeriesObj[tag].Value)
+                        consequentStudySeriesObj[tag].Value.forEach(val => {
+                          if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [val];
+                          else if (
+                            // if both studies have values, cumulate them but don't make duplicates
+                            (typeof studySeriesObj[tag].Value[0] === 'string' &&
+                              !studySeriesObj[tag].Value.includes(val)) ||
+                            !_.findIndex(studySeriesObj[tag].Value, val) === -1
+                          ) {
+                            studySeriesObj[tag].Value.push(val);
+                          }
+                        });
+                    }
+                  });
+                  // skip the consequent study entries
+                  i = j;
+                }
               }
+              res.push(studySeriesObj);
             }
-            res.push(studySeriesObj);
           }
           try {
             if (request.query.limit) {
@@ -284,17 +313,18 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_series',
         {
-          startkey: [request.params.study, ''],
-          endkey: [`${request.params.study}\u9999`, '{}'],
+          startkey: [request.params.study],
+          endkey: [request.params.study, {}, {}],
           reduce: true,
           group_level: 3,
+          stale: 'ok',
         },
         (error, body) => {
           if (!error) {
             const res = [];
             body.rows.forEach(series => {
               // get the actual instance object (tags only)
-              const seriesObj = series.key[2];
+              const seriesObj = fastify.formatValuesWithVR(series.key[2], seriesTags);
               if (fastify.queryObj(request.query, seriesObj, queryKeys)) {
                 seriesObj['00201209'].Value = [];
                 seriesObj['00201209'].Value.push(series.value);
@@ -329,18 +359,20 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_instances',
         {
-          startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
+          startkey: [request.params.study, request.params.series],
+          endkey: [request.params.study, request.params.series, {}],
           reduce: true,
           group: true,
           group_level: 4,
+          stale: 'ok',
         },
         (error, body) => {
           if (!error) {
             const res = [];
             body.rows.forEach(instance => {
               // get the actual instance object (tags only)
-              res.push(instance.key[3]);
+              const instanceObj = fastify.formatValuesWithVR(instance.key[3], instanceTags);
+              res.push(instanceObj);
             });
             reply.code(200).send(res);
           } else {
@@ -614,8 +646,8 @@ async function couchdb(fastify, options) {
         'instances',
         'wado_metadata',
         {
-          startkey: [request.params.study, '', ''],
-          endkey: [`${request.params.study}\u9999`, {}, {}],
+          startkey: [request.params.study],
+          endkey: [request.params.study, {}, {}],
         },
         (error, body) => {
           if (!error) {
@@ -642,8 +674,8 @@ async function couchdb(fastify, options) {
         'instances',
         'wado_metadata',
         {
-          startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, {}],
+          startkey: [request.params.study, request.params.series],
+          endkey: [request.params.study, request.params.series, {}],
         },
         (error, body) => {
           if (!error) {
@@ -704,7 +736,8 @@ async function couchdb(fastify, options) {
           if (!error) {
             const res = [];
             body.rows.forEach(patient => {
-              res.push(patient.key);
+              const patientObj = fastify.formatValuesWithVR(patient.key, patientTags);
+              res.push(patientObj);
             });
             reply.code(200).send(res);
           } else {
@@ -906,6 +939,23 @@ async function couchdb(fastify, options) {
       reply.send(new InternalError('linkFolder', e));
     }
   });
+  fastify.decorate('updateViews', dbConn => {
+    let dicomDB = dbConn;
+    if (!dicomDB) dicomDB = fastify.couch.db.use(config.db);
+    // trigger view updates
+    const updateViewPromisses = [];
+    updateViewPromisses.push(() => {
+      return dicomDB.view('instances', 'qido_study', {});
+    });
+    updateViewPromisses.push(() => {
+      return dicomDB.view('instances', 'qido_series', {});
+    });
+    updateViewPromisses.push(() => {
+      return dicomDB.view('instances', 'qido_instances', {});
+    });
+    // I don't need to wait
+    fastify.dbPqueue.addAll(updateViewPromisses);
+  });
 
   fastify.decorate('stow', (request, reply) => {
     try {
@@ -922,6 +972,7 @@ async function couchdb(fastify, options) {
       fastify.dbPqueue
         .addAll(promises)
         .then(() => {
+          fastify.updateViews(dicomDB);
           fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
         })
@@ -945,8 +996,8 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_instances',
         {
-          startkey: [request.params.study, '', ''],
-          endkey: [`${request.params.study}\u9999`, '{}', '{}'],
+          startkey: [request.params.study],
+          endkey: [request.params.study, {}, {}],
           reduce: false,
           include_docs: true,
         },
@@ -970,6 +1021,7 @@ async function couchdb(fastify, options) {
                   });
               });
             });
+            fastify.updateViews(dicomDB);
             fastify.log.info(`Deleted study ${request.params.study} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
           }
@@ -989,8 +1041,8 @@ async function couchdb(fastify, options) {
         'instances',
         'qido_instances',
         {
-          startkey: [request.params.study, request.params.series, ''],
-          endkey: [`${request.params.study}`, `${request.params.series}\u9999`, '{}'],
+          startkey: [request.params.study, request.params.series],
+          endkey: [request.params.study, request.params.series, {}],
           reduce: false,
           include_docs: true,
         },
@@ -1014,7 +1066,7 @@ async function couchdb(fastify, options) {
                   });
               });
             });
-
+            fastify.updateViews(dicomDB);
             fastify.log.info(`Deleted series ${request.params.series} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
           }
@@ -1043,31 +1095,27 @@ async function couchdb(fastify, options) {
       // get the datasets
       const dicomDB = fastify.couch.db.use(config.db);
       let isFiltered = false;
-      const myParams = request.params;
-      if (!request.params.series) {
-        myParams.series = '';
-        myParams.seriesEnd = '{}';
-        if (!request.params.study) {
-          myParams.study = '';
-          myParams.studyEnd = '{}';
-        } else {
-          myParams.studyEnd = `${request.params.study}\u9999`;
-          isFiltered = true;
-        }
-      } else {
-        myParams.seriesEnd = `${request.params.series}\u9999`;
-        myParams.studyEnd = request.params.study;
+      const startKey = [];
+      const endKey = [];
+      if (request.params.study) {
+        startKey.push(request.params.study);
+        endKey.push(request.params.study);
         isFiltered = true;
       }
+      if (request.params.series) {
+        startKey.push(request.params.series);
+        endKey.push(request.params.series);
+        isFiltered = true;
+      }
+      for (let i = endKey.length; i < 3; i += 1) endKey.push({});
       let filterOptions = {};
       if (isFiltered) {
         filterOptions = {
-          startkey: [myParams.study, myParams.series, ''],
-          endkey: [myParams.studyEnd, myParams.seriesEnd, '{}'],
+          startkey: startKey,
+          endkey: endKey,
           reduce: false,
           include_docs: true,
         };
-
         dicomDB.view('instances', 'qido_instances', filterOptions, async (error, body) => {
           if (!error) {
             try {
@@ -1158,6 +1206,8 @@ async function couchdb(fastify, options) {
   fastify.after(async () => {
     try {
       await fastify.init();
+      // update views on startup
+      fastify.updateViews();
     } catch (err) {
       fastify.log.info(`Cannot connect to couchdb (err:${err}), shutting down the server`);
       fastify.close();
