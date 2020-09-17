@@ -767,13 +767,25 @@ async function couchdb(fastify, options) {
       dataset: dicomData.dict,
       md5hash: incomingMd5,
     };
-    if (filePath) couchDoc.filePath = filePath;
+
+    const skipHashCheck = true;
+    const skipAttachment = true;
+
+    if (filePath) {
+      couchDoc.filePath = filePath;
+    }
+
     return new Promise((resolve, reject) =>
       dicomDB.get(couchDoc._id, (error, existing) => {
-        if (!error) {
+        if (existing && !error) {
           couchDoc._rev = existing._rev;
-          // old documents won't have md5
+          if (skipHashCheck) {
+            resolve('File already in system');
+            return;
+          }
+
           if (existing.md5hash) {
+            // old documents won't have md5
             // get the md5 of the buffer
             if (
               existing.md5hash === incomingMd5 && // same md5
@@ -785,14 +797,16 @@ async function couchdb(fastify, options) {
               return;
             }
           }
+
           fastify.log.info(`Updating document for dicom ${couchDoc._id}`);
         }
 
         dicomDB.insert(couchDoc, (err, data) => {
           if (err) {
             reject(err);
-          }
-          if (!filePath)
+          } else if (filePath || skipAttachment === true) {
+            resolve('Saving successful');
+          } else {
             dicomDB.attachment.insert(
               couchDoc._id,
               'object.dcm',
@@ -806,7 +820,7 @@ async function couchdb(fastify, options) {
                 resolve('Saving successful');
               }
             );
-          else resolve('Saving successful');
+          }
         });
       })
     );
@@ -972,7 +986,7 @@ async function couchdb(fastify, options) {
       fastify.dbPqueue
         .addAll(promises)
         .then(() => {
-          fastify.updateViews(dicomDB);
+          // fastify.updateViews(dicomDB);
           fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
         })
