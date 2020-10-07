@@ -2,6 +2,7 @@
   "name": "dicomweb-server",
   "version": "0.0.0-development",
   "description": "Lightweight DICOMweb Server with CouchDB",
+  "repository": "https://github.com/dcmjs-org/dicomweb-server",
   "main": "server.js",
   "dependencies": {
     "atob": "^2.1.2",

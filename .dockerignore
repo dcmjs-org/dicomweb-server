@@ -1,0 +1,6 @@
+node_modules
+.circleci
+.prettierrc
+.eslintignore
+.git
+couchdb-data

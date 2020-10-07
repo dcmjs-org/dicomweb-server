@@ -1,0 +1,38 @@
+# docker-compose up
+# curl -X PUT http://127.0.0.1:5984/_users
+# curl -X PUT http://127.0.0.1:5984/_replicator
+# curl -X PUT http://127.0.0.1:5984/_global_changes
+# curl -X PUT http://127.0.0.1:5984/chronicle
+# http://localhost:5984/_utils/
+version: '3.8'
+
+services:
+  dicomweb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ohif/dicomweb-server:latest
+    hostname: dicomweb-server
+    environment:
+      - PORT=5984
+      - DB_SERVER=http://couchdb
+    ports:
+      - '5985:5985'
+    depends_on:
+      - couchdb
+    restart: unless-stopped
+
+  ##
+  # LINK: https://hub.docker.com/_/couchdb
+  ##
+  couchdb:
+    image: couchdb:2.3.1
+    hostname: couchdb
+    volumes:
+      - ./couchdb-data:/opt/couchdb/data
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=password
+    ports:
+      - '5984:5984'
+    restart: unless-stopped
