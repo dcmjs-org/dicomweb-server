@@ -47,6 +47,7 @@ async function dimse(fastify, options) {
           const filePath = path.join(__dirname, `../${options.tempDir}/${data.replace('file:', '')}`);
           fastify.dbPqueue
             .add(() => {
+              fastify.updateViews(dicomDB);
               fastify.log.info(`Saving DIMSE file ${filePath}`);
               return fastify.saveFile(filePath);
             })

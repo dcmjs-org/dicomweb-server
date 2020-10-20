@@ -920,6 +920,7 @@ async function couchdb(fastify, options) {
         const dicomDB = fastify.couch.db.use(config.db);
         const result = await fastify.processFolder(request.query.path, dicomDB);
         if (result.success) {
+          fastify.updateViews(dicomDB);
           fastify.log.info(`Folder ${request.query.path} linked successfully`);
           reply.code(200).send('success');
         } else {
