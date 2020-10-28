@@ -33,7 +33,7 @@ async function dimse(fastify, options) {
           options.port,
           '--exec-sync',
           '--exec-on-reception',
-          'dcmdump --load-short --print-short --print-filename --search PatientName #p/#f',
+          'echo "file:#f"',
         ],
       });
       storeServer.on('error', err => {
@@ -43,10 +43,11 @@ async function dimse(fastify, options) {
         fastify.log.warn(`Closed storescp server with code ${code} and signal ${signal}`);
       });
       storeServer.stdout.pipe(split2()).on('data', data => {
-        if (data.startsWith('# dcmdump (1/1): ')) {
-          const filePath = path.join(__dirname, data.replace('# dcmdump (1/1): ', '../'));
+        if (data.startsWith('file:')) {
+          const filePath = path.join(__dirname, `../${options.tempDir}/${data.replace('file:', '')}`);
           fastify.dbPqueue
             .add(() => {
+              fastify.updateViews();
               fastify.log.info(`Saving DIMSE file ${filePath}`);
               return fastify.saveFile(filePath);
             })
