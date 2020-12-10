@@ -6,7 +6,7 @@ async function routes(fastify) {
     url: '/patients',
     schema: {
       response: {
-        200: 'patients_schema#',
+        200: { $ref: 'patients_schema#' },
       },
     },
 
