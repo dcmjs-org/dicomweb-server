@@ -59,7 +59,7 @@ fastify.register(require('fastify-cors'), {
 
 // register CouchDB plugin we created
 fastify.register(require('./plugins/CouchDB'), {
-  url: `${config.dbServer}:${config.dbPort}`,
+  url: config.dbUrlWithAuth,
 });
 
 // register DIMSE plugin we created

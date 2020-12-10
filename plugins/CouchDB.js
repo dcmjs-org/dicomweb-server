@@ -490,7 +490,7 @@ async function couchdb(fastify, options) {
       new Promise(async (resolve, reject) => {
         try {
           this.request = Axios.create({
-            baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
+            baseURL: `${config.dbUrlWithAuth}/${config.db}`,
           });
           const id = doc.id ? doc.id : doc._id;
           // make a head query to get the attachment size
@@ -527,13 +527,15 @@ async function couchdb(fastify, options) {
                   );
                   framePromises.push(
                     new Promise((rangeResolve, rangeReject) => {
-                      const opt = {
+                      let opt = {
                         host: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
                         path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
                         headers: { Range: range },
                       };
+                      if (config.dbUser && config.dbPassword)
+                        opt = { ...opt, auth: `${config.dbUser}:${config.dbPassword}` };
                       const data = [];
                       // node request is failing range requests with a parser error after reading the full content
                       // curl and web browser xhr works (probably ignores the remaining) (couchdb has javascript tests for range query which are done with web browser xhr)
