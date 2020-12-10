@@ -528,7 +528,7 @@ async function couchdb(fastify, options) {
                   framePromises.push(
                     new Promise((rangeResolve, rangeReject) => {
                       const opt = {
-                        hostname: config.dbServer.replace('http://', ''),
+                        host: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
                         path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
