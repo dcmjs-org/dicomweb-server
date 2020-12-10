@@ -17,7 +17,6 @@
     "fastify-plugin": "^3.0.0",
     "fastify-static": "^3.3.0",
     "fs-extra": "^9.0.1",
-    "http": "0.0.1-security",
     "keycloak-backend": "^2.0.1",
     "md5": "^2.3.0",
     "nano": "^9.0.1",
