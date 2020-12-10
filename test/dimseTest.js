@@ -15,7 +15,7 @@ describe('DIMSE', () => {
   const dcmtk = require('../../dcmtk-node')({
     verbose: false,
   });
-  it('should be able to echoscu', done => {
+  it('should be able to echoscu', (done) => {
     dcmtk.echoscu(
       {
         args: ['-aet', config.DIMSE.AET, '-aec', 'TEST', 'localhost', config.DIMSE.port],

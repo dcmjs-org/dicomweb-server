@@ -36,15 +36,18 @@ async function dimse(fastify, options) {
           'echo "file:#f"',
         ],
       });
-      storeServer.on('error', err => {
+      storeServer.on('error', (err) => {
         fastify.log.error(`Error on storescp server: ${err.message}`);
       });
       storeServer.on('close', (code, signal) => {
         fastify.log.warn(`Closed storescp server with code ${code} and signal ${signal}`);
       });
-      storeServer.stdout.pipe(split2()).on('data', data => {
+      storeServer.stdout.pipe(split2()).on('data', (data) => {
         if (data.startsWith('file:')) {
-          const filePath = path.join(__dirname, `../${options.tempDir}/${data.replace('file:', '')}`);
+          const filePath = path.join(
+            __dirname,
+            `../${options.tempDir}/${data.replace('file:', '')}`
+          );
           fastify.dbPqueue
             .add(() => {
               fastify.updateViews();
