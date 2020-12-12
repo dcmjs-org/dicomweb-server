@@ -31,61 +31,61 @@ after(() => {
 });
 
 describe('OIDC Auth', () => {
-  it('patients call should fail unauthorized with wrong authentication token', done => {
+  it('patients call should fail unauthorized with wrong authentication token', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
       .set('Authorization', 'Bearer sillytoken')
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(401);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
-  it('patients call should fail unauthorized without authentication', done => {
+  it('patients call should fail unauthorized without authentication', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(401);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
   // test successful auth finally as we are not revoking token for now
-  it('it should authenticate through keycloak to get the token (not API functionality, for debugging purposes only)', done => {
+  it('it should authenticate through keycloak to get the token (not API functionality, for debugging purposes only)', (done) => {
     keycloak.accessToken.config.username = username;
     keycloak.accessToken.config.password = password;
     // see if we can authenticate
     // keycloak supports oidc, this is a workaround to support basic authentication
     token = keycloak.accessToken
       .get()
-      .then(accessToken => {
+      .then((accessToken) => {
         token = accessToken;
         done();
       })
-      .catch(err => done(err));
+      .catch((err) => done(err));
   });
 
   // test successful auth finally as we are not revoking token for now
-  it('it should GET no patient with oidc auth', done => {
+  it('it should GET no patient with oidc auth', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
       .set('Authorization', `Bearer ${token}`)
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });

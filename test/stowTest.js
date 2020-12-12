@@ -19,11 +19,11 @@ after(() => {
 });
 
 describe('STOW Tests', () => {
-  it('studies should be empty', done => {
+  it('studies should be empty', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(`${config.prefix}/studies`)
-      .then(res => {
+      .then((res) => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
 
@@ -35,7 +35,7 @@ describe('STOW Tests', () => {
         expect(res.body.length).to.be.eql(0);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
@@ -43,7 +43,7 @@ describe('STOW Tests', () => {
   const binaryParser = (res, cb) => {
     res.setEncoding('binary');
     res.data = '';
-    res.on('data', chunk => {
+    res.on('data', (chunk) => {
       res.data += chunk;
     });
     res.on('end', () => {
@@ -51,7 +51,7 @@ describe('STOW Tests', () => {
     });
   };
 
-  it('wado image should not exist', done => {
+  it('wado image should not exist', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
@@ -68,35 +68,35 @@ describe('STOW Tests', () => {
       });
   });
 
-  it(`linkFolder should not work for data folder when called with process host`, done => {
+  it(`linkFolder should not work for data folder when called with process host`, (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .post(`${config.prefix}/linkFolder?path=test/data`)
       .send()
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(400);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
-  it('linkFolder should work for data folder with localhost', done => {
+  it('linkFolder should work for data folder with localhost', (done) => {
     chai
       .request(`http://localhost:${process.env.port}`)
       .post(`${config.prefix}/linkFolder?path=test/data`)
       .send()
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(200);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
-  it('wado image should return correct amount of data', done => {
+  it('wado image should return correct amount of data', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
@@ -120,7 +120,7 @@ describe('STOW Tests', () => {
       });
   });
 
-  it('stow should succeed with multipart study', done => {
+  it('stow should succeed with multipart study', (done) => {
     const buffer = fs.readFileSync('test/data/multipart_study');
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
@@ -130,7 +130,7 @@ describe('STOW Tests', () => {
         'multipart/related; type=application/dicom; boundary=--594b1491-fdae-4585-9b48-4d7cd999edb3'
       )
       .send(buffer)
-      .then(res => {
+      .then((res) => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
 
@@ -140,12 +140,12 @@ describe('STOW Tests', () => {
         expect(res.statusCode).to.equal(200);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
-  it('wado study should return correct amount of data', done => {
+  it('wado study should return correct amount of data', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
@@ -169,7 +169,7 @@ describe('STOW Tests', () => {
       });
   });
 
-  it('wado series should return correct amount of data', done => {
+  it('wado series should return correct amount of data', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(
@@ -193,7 +193,7 @@ describe('STOW Tests', () => {
       });
   });
 
-  it('stow should fail with dicom file', done => {
+  it('stow should fail with dicom file', (done) => {
     const buffer = fs.readFileSync('test/data/image.dcm');
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
@@ -203,11 +203,11 @@ describe('STOW Tests', () => {
         'multipart; type=application/dicom; boundary=--594b1491-fdae-4585-9b48-4d7cd999edb3'
       )
       .send(buffer)
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(500);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });

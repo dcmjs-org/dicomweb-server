@@ -7,11 +7,11 @@ chai.use(chaiHttp);
 const { expect } = chai;
 
 describe('Patients API', () => {
-  it('it should GET all patients (one patient from stowed data)', done => {
+  it('it should GET all patients (one patient from stowed data)', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(`${config.prefix}/patients`)
-      .then(res => {
+      .then((res) => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
 
@@ -23,16 +23,16 @@ describe('Patients API', () => {
         expect(res.body.length).to.be.eql(1);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
-  it('returned patient should be MRI-DIR-T2_3', done => {
+  it('returned patient should be MRI-DIR-T2_3', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get(`${config.prefix}/patients`)
-      .then(res => {
+      .then((res) => {
         if (res.statusCode >= 400) {
           done(new Error(res.body.error, res.body.message));
 
@@ -43,7 +43,7 @@ describe('Patients API', () => {
         expect(res.body[0]['00100010'].Value[0].Alphabetic).to.be.eql('MRI-DIR-T2_3');
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
