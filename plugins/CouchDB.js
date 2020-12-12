@@ -56,7 +56,7 @@ async function couchdb(fastify, options) {
             viewDoc.views[keys[i]] = values[i];
           }
           // insert the updated/created design document
-          await dicomDB.insert(viewDoc, '_design/instances', insertErr => {
+          await dicomDB.insert(viewDoc, '_design/instances', (insertErr) => {
             if (insertErr) {
               fastify.log.info(`Error updating the design document ${insertErr.message}`);
               reject(insertErr);
@@ -205,7 +205,7 @@ async function couchdb(fastify, options) {
       });
 
       bodyStudies
-        .then(values => {
+        .then((values) => {
           const studies = {};
           studies.rows = values.rows;
           const res = [];
@@ -235,7 +235,7 @@ async function couchdb(fastify, options) {
                 if (currentStudyUID === consequentStudyUID) {
                   // same study merge
                   const consequentStudySeriesObj = studies.rows[j].key[3];
-                  Object.keys(consequentStudySeriesObj).forEach(tag => {
+                  Object.keys(consequentStudySeriesObj).forEach((tag) => {
                     if (tag === '00201208') {
                       // numberOfStudyRelatedInstances needs to be cumulated
                       studySeriesObj['00201208'].Value[0] += studies.rows[j].value;
@@ -245,7 +245,7 @@ async function couchdb(fastify, options) {
                         consequentStudySeriesObj['00201206'].Value[0];
                     } else if (studySeriesObj[tag] !== consequentStudySeriesObj[tag]) {
                       if (consequentStudySeriesObj[tag].Value)
-                        consequentStudySeriesObj[tag].Value.forEach(val => {
+                        consequentStudySeriesObj[tag].Value.forEach((val) => {
                           if (!studySeriesObj[tag].Value) studySeriesObj[tag].Value = [val];
                           else if (
                             // if both studies have values, cumulate them but don't make duplicates
@@ -275,7 +275,7 @@ async function couchdb(fastify, options) {
             );
           }
         })
-        .catch(err => {
+        .catch((err) => {
           // TODO send correct error codes
           // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.7.html#table_6.7-1
           reply.send(new InternalError('QIDO Studies retreival from couchdb', err));
@@ -322,7 +322,7 @@ async function couchdb(fastify, options) {
         (error, body) => {
           if (!error) {
             const res = [];
-            body.rows.forEach(series => {
+            body.rows.forEach((series) => {
               // get the actual instance object (tags only)
               const seriesObj = fastify.formatValuesWithVR(series.key[2], seriesTags);
               if (fastify.queryObj(request.query, seriesObj, queryKeys)) {
@@ -369,7 +369,7 @@ async function couchdb(fastify, options) {
         (error, body) => {
           if (!error) {
             const res = [];
-            body.rows.forEach(instance => {
+            body.rows.forEach((instance) => {
               // get the actual instance object (tags only)
               const instanceObj = fastify.formatValuesWithVR(instance.key[3], instanceTags);
               res.push(instanceObj);
@@ -461,7 +461,7 @@ async function couchdb(fastify, options) {
         });
       // pack the frames in a multipart and send
       const frameResponses = await Promise.all(framePromises);
-      frameResponses.forEach(response => frames.push(response));
+      frameResponses.forEach((response) => frames.push(response));
 
       const { data, boundary } = dcmjs.utilities.message.multipartEncode(
         frames,
@@ -490,14 +490,14 @@ async function couchdb(fastify, options) {
       new Promise(async (resolve, reject) => {
         try {
           this.request = Axios.create({
-            baseURL: `${config.dbServer}:${config.dbPort}/${config.db}`,
+            baseURL: `${config.dbUrlWithAuth}/${config.db}`,
           });
           const id = doc.id ? doc.id : doc._id;
           // make a head query to get the attachment size
           // TODO nano doesn't support db.attachment.head
           this.request
             .head(`/${id}/object.dcm`)
-            .then(head => {
+            .then((head) => {
               fastify.log.info(
                 `Content length of the attachment is ${head.headers['content-length']}`
               );
@@ -516,25 +516,26 @@ async function couchdb(fastify, options) {
                 const framePromises = [];
                 const frameNums = framesParam.split(',');
                 fastify.log.info(`frameNums that are sent : ${frameNums}`);
-                frameNums.forEach(frameNum => {
+                frameNums.forEach((frameNum) => {
                   const frameNo = Number(frameNum);
                   // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
-                  const range = `bytes=${headerSize +
-                    calcVars.frameSize * (frameNo - 1)}-${headerSize -
-                    1 +
-                    calcVars.frameSize * frameNo}`;
+                  const range = `bytes=${headerSize + calcVars.frameSize * (frameNo - 1)}-${
+                    headerSize - 1 + calcVars.frameSize * frameNo
+                  }`;
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
                   framePromises.push(
                     new Promise((rangeResolve, rangeReject) => {
-                      const opt = {
-                        hostname: config.dbServer.replace('http://', ''),
+                      let opt = {
+                        host: config.dbServer.replace('http://', ''),
                         port: config.dbPort,
                         path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
                         headers: { Range: range },
                       };
+                      if (config.dbUser && config.dbPassword)
+                        opt = { ...opt, auth: `${config.dbUser}:${config.dbPassword}` };
                       const data = [];
                       // node request is failing range requests with a parser error after reading the full content
                       // curl and web browser xhr works (probably ignores the remaining) (couchdb has javascript tests for range query which are done with web browser xhr)
@@ -542,9 +543,9 @@ async function couchdb(fastify, options) {
                       // also tried adding range query capability to nano, but it uses node's request package and throws the parser error
                       // this code retrieves the range request using http.request and ignores if it encounters an error although it has buffer data
                       // returns the retrieved buffer
-                      const req = http.request(opt, res => {
+                      const req = http.request(opt, (res) => {
                         try {
-                          res.on('data', d => {
+                          res.on('data', (d) => {
                             data.push(d);
                           });
                           res.on('end', () => {
@@ -564,7 +565,7 @@ async function couchdb(fastify, options) {
                         }
                       });
 
-                      req.on('error', error => {
+                      req.on('error', (error) => {
                         if (data.length === 0) rangeReject(new Error('Empty buffer'));
                         else {
                           const databuffer = Buffer.concat(data);
@@ -585,7 +586,7 @@ async function couchdb(fastify, options) {
                 reject(new InternalError('Not able to get frame', frameErr));
               }
             })
-            .catch(err => {
+            .catch((err) => {
               reject(new InternalError(`Couldn't get content length for the attachment`, err));
             });
         } catch (err) {
@@ -616,7 +617,7 @@ async function couchdb(fastify, options) {
             const framePromises = [];
             const frameNums = framesParam.split(',');
             fastify.log.info(`frameNums that are sent : ${frameNums}`);
-            frameNums.forEach(frameNum => {
+            frameNums.forEach((frameNum) => {
               const frameNo = Number(frameNum);
               // calculate offset using frame count * frame size (row*col*pixel byte*samples for pixel)
               const offset = headerSize + calcVars.frameSize * (frameNo - 1);
@@ -652,7 +653,7 @@ async function couchdb(fastify, options) {
         (error, body) => {
           if (!error) {
             const res = [];
-            body.rows.forEach(instance => {
+            body.rows.forEach((instance) => {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
@@ -680,7 +681,7 @@ async function couchdb(fastify, options) {
         (error, body) => {
           if (!error) {
             const res = [];
-            body.rows.forEach(instance => {
+            body.rows.forEach((instance) => {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
@@ -707,7 +708,7 @@ async function couchdb(fastify, options) {
         (error, body) => {
           if (!error) {
             const res = [];
-            body.rows.forEach(instance => {
+            body.rows.forEach((instance) => {
               // get the actual instance object (tags only)
               res.push(instance.value);
             });
@@ -735,7 +736,7 @@ async function couchdb(fastify, options) {
         (error, body) => {
           if (!error) {
             const res = [];
-            body.rows.forEach(patient => {
+            body.rows.forEach((patient) => {
               const patientObj = fastify.formatValuesWithVR(patient.key, patientTags);
               res.push(patientObj);
             });
@@ -750,7 +751,7 @@ async function couchdb(fastify, options) {
     }
   });
 
-  fastify.decorate('saveFile', filePath => {
+  fastify.decorate('saveFile', (filePath) => {
     const arrayBuffer = fs.readFileSync(filePath).buffer;
     return fastify.saveBuffer(arrayBuffer);
   });
@@ -799,7 +800,7 @@ async function couchdb(fastify, options) {
               body,
               'application/dicom',
               { rev: data.rev },
-              attachmentErr => {
+              (attachmentErr) => {
                 if (attachmentErr) {
                   reject(attachmentErr);
                 }
@@ -844,18 +845,16 @@ async function couchdb(fastify, options) {
                       reject(folderErr);
                     }
                   else
-                    promises.push(() => {
-                      return (
-                        fastify
-                          .processFile(linkDir, files[i], dicomDB)
-                          // eslint-disable-next-line no-loop-func
-                          .catch(error => {
-                            result.errors.push(error);
-                          })
-                      );
-                    });
+                    promises.push(() =>
+                      fastify
+                        .processFile(linkDir, files[i], dicomDB)
+                        // eslint-disable-next-line no-loop-func
+                        .catch((error) => {
+                          result.errors.push(error);
+                        })
+                    );
               }
-              fastify.dbPqueue.addAll(promises).then(async values => {
+              fastify.dbPqueue.addAll(promises).then(async (values) => {
                 try {
                   for (let i = 0; values.length; i += 1) {
                     if (
@@ -887,10 +886,10 @@ async function couchdb(fastify, options) {
         try {
           let buffer = [];
           const readableStream = fs.createReadStream(`${dir}/${filename}`);
-          readableStream.on('data', chunk => {
+          readableStream.on('data', (chunk) => {
             buffer.push(chunk);
           });
-          readableStream.on('error', readErr => {
+          readableStream.on('error', (readErr) => {
             fastify.log.error(`Error in save when reading file ${dir}/${filename}: ${readErr}`);
             reject(new InternalError(`Reading file ${dir}/${filename}`, readErr));
           });
@@ -916,7 +915,7 @@ async function couchdb(fastify, options) {
 
   fastify.decorate('linkFolder', async (request, reply) => {
     try {
-      if (request.req.hostname.startsWith('localhost')) {
+      if (request.hostname.startsWith('localhost')) {
         const dicomDB = fastify.couch.db.use(config.db);
         const result = await fastify.processFolder(request.query.path, dicomDB);
         if (result.success) {
@@ -940,20 +939,14 @@ async function couchdb(fastify, options) {
       reply.send(new InternalError('linkFolder', e));
     }
   });
-  fastify.decorate('updateViews', dbConn => {
+  fastify.decorate('updateViews', (dbConn) => {
     let dicomDB = dbConn;
     if (!dicomDB) dicomDB = fastify.couch.db.use(config.db);
     // trigger view updates
     const updateViewPromisses = [];
-    updateViewPromisses.push(() => {
-      return dicomDB.view('instances', 'qido_study', {});
-    });
-    updateViewPromisses.push(() => {
-      return dicomDB.view('instances', 'qido_series', {});
-    });
-    updateViewPromisses.push(() => {
-      return dicomDB.view('instances', 'qido_instances', {});
-    });
+    updateViewPromisses.push(() => dicomDB.view('instances', 'qido_study', {}));
+    updateViewPromisses.push(() => dicomDB.view('instances', 'qido_series', {}));
+    updateViewPromisses.push(() => dicomDB.view('instances', 'qido_instances', {}));
     // I don't need to wait
     fastify.dbPqueue.addAll(updateViewPromisses);
   });
@@ -966,9 +959,7 @@ async function couchdb(fastify, options) {
       const promises = [];
       for (let i = 0; i < parts.length; i += 1) {
         const arrayBuffer = parts[i];
-        promises.push(() => {
-          return fastify.saveBuffer(arrayBuffer, dicomDB);
-        });
+        promises.push(() => fastify.saveBuffer(arrayBuffer, dicomDB));
       }
       fastify.dbPqueue
         .addAll(promises)
@@ -977,7 +968,7 @@ async function couchdb(fastify, options) {
           fastify.log.info(`Stow is done successfully`);
           reply.code(200).send('success');
         })
-        .catch(err => {
+        .catch((err) => {
           // TODO Proper error reporting implementation required
           // per http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_6.6.html#table_6.6.1-1
           fastify.log.error(`Error in STOW: ${err}`);
@@ -1004,24 +995,27 @@ async function couchdb(fastify, options) {
         },
         async (error, body) => {
           if (!error) {
-            const docs = _.map(body.rows, instance => {
-              return { _id: instance.key[2], _rev: instance.doc._rev, _deleted: true };
-            });
-            await fastify.dbPqueue.add(() => {
-              return new Promise((resolve, reject) => {
-                dicomDB
-                  .bulk({ docs })
-                  .then(() => {
-                    resolve();
-                  })
-                  .catch(deleteError => {
-                    fastify.log.info(
-                      `Error deleting study ${request.params.study} with ${docs.length} dicoms`
-                    );
-                    reject(deleteError);
-                  });
-              });
-            });
+            const docs = _.map(body.rows, (instance) => ({
+              _id: instance.key[2],
+              _rev: instance.doc._rev,
+              _deleted: true,
+            }));
+            await fastify.dbPqueue.add(
+              () =>
+                new Promise((resolve, reject) => {
+                  dicomDB
+                    .bulk({ docs })
+                    .then(() => {
+                      resolve();
+                    })
+                    .catch((deleteError) => {
+                      fastify.log.info(
+                        `Error deleting study ${request.params.study} with ${docs.length} dicoms`
+                      );
+                      reject(deleteError);
+                    });
+                })
+            );
             fastify.updateViews(dicomDB);
             fastify.log.info(`Deleted study ${request.params.study} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
@@ -1049,24 +1043,27 @@ async function couchdb(fastify, options) {
         },
         async (error, body) => {
           if (!error) {
-            const docs = _.map(body.rows, instance => {
-              return { _id: instance.key[2], _rev: instance.doc._rev, _deleted: true };
-            });
-            await fastify.dbPqueue.add(() => {
-              return new Promise((resolve, reject) => {
-                dicomDB
-                  .bulk({ docs })
-                  .then(() => {
-                    resolve();
-                  })
-                  .catch(deleteError => {
-                    fastify.log.info(
-                      `Error deleting series ${request.params.series} with ${docs.length} dicoms`
-                    );
-                    reject(deleteError);
-                  });
-              });
-            });
+            const docs = _.map(body.rows, (instance) => ({
+              _id: instance.key[2],
+              _rev: instance.doc._rev,
+              _deleted: true,
+            }));
+            await fastify.dbPqueue.add(
+              () =>
+                new Promise((resolve, reject) => {
+                  dicomDB
+                    .bulk({ docs })
+                    .then(() => {
+                      resolve();
+                    })
+                    .catch((deleteError) => {
+                      fastify.log.info(
+                        `Error deleting series ${request.params.series} with ${docs.length} dicoms`
+                      );
+                      reject(deleteError);
+                    });
+                })
+            );
             fastify.updateViews(dicomDB);
             fastify.log.info(`Deleted series ${request.params.series} with ${docs.length} dicoms`);
             reply.code(200).send('Deleted successfully');
@@ -1121,7 +1118,7 @@ async function couchdb(fastify, options) {
           if (!error) {
             try {
               const datasetsReqs = [];
-              body.rows.forEach(instance => {
+              body.rows.forEach((instance) => {
                 datasetsReqs.push(fastify.getDicomBuffer(instance.doc, dicomDB));
               });
               const datasets = await Promise.all(datasetsReqs);
@@ -1156,7 +1153,7 @@ async function couchdb(fastify, options) {
 
   fastify.decorate(
     'packMultipartDicomsInternal',
-    datasets =>
+    (datasets) =>
       new Promise(async (resolve, reject) => {
         try {
           fastify.log.info(`Packing ${datasets.length} dicoms`);
@@ -1176,7 +1173,7 @@ async function couchdb(fastify, options) {
         try {
           const stream = await fastify.getDicomFileAsStream(instance, dicomDB);
           const bufs = [];
-          stream.on('data', d => {
+          stream.on('data', (d) => {
             bufs.push(d);
           });
           stream.on('end', () => {

@@ -20,46 +20,46 @@ after(() => {
 });
 
 describe('Basic Auth', () => {
-  it('patients call should fail unauthorized with wrong authentication info', done => {
+  it('patients call should fail unauthorized with wrong authentication info', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
       .auth(username, 'aaaaaa')
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(401);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
-  it('patients call should fail unauthorized without authentication', done => {
+  it('patients call should fail unauthorized without authentication', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(401);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });
 
   // test successful auth finally as we are not revoking token for now
-  it('it should GET no patient with basic auth', done => {
+  it('it should GET no patient with basic auth', (done) => {
     chai
       .request(`http://${process.env.host}:${process.env.port}`)
       .get('/patients')
       .auth(username, password)
-      .then(res => {
+      .then((res) => {
         expect(res.statusCode).to.equal(200);
         expect(res.body).to.be.a('array');
         expect(res.body.length).to.be.eql(0);
         done();
       })
-      .catch(e => {
+      .catch((e) => {
         done(e);
       });
   });

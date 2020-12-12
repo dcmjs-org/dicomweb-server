@@ -7,7 +7,7 @@ async function qidoRoutes(fastify) {
     url: '/studies',
     schema: {
       response: {
-        200: 'studies_schema#',
+        200: { $ref: 'studies_schema#' },
       },
     },
     handler: fastify.getQIDOStudies,
@@ -28,7 +28,7 @@ async function qidoRoutes(fastify) {
         },
       },
       response: {
-        200: 'series_schema#',
+        200: { $ref: 'series_schema#' },
       },
     },
 
@@ -53,7 +53,7 @@ async function qidoRoutes(fastify) {
         },
       },
       response: {
-        200: 'instances_schema#',
+        200: { $ref: 'instances_schema#' },
       },
     },
 

@@ -1,6 +1,8 @@
 module.exports = {
   env: 'development',
   dbServer: process.env.DB_SERVER || 'http://localhost',
+  dbUser: process.env.DB_USER, // no default
+  dbPassword: process.env.DB_PASSWORD, // no default
   db: process.env.DB_NAME || 'chronicle',
   dbPort: process.env.DB_PORT || 5984,
   prefix: process.env.PREFIX || '',
