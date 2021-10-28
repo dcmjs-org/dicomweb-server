@@ -17,6 +17,12 @@ The value you put in should be the name of a json file in the config directory. 
     "clientSecret": "your-secret"
 }`
 
+If using the default authentication of couchdb with an admin account, you will need to specify the admin username and password in config/development.js in the below style:
+
+`{
+    dbServer: process.env.DB_SERVER || 'http://username:password@localhost'
+}`
+
 
 
 ## Installation
