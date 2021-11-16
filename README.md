@@ -66,7 +66,7 @@ Store a DATA_DIRECTORY of DICOM image files (here with the ".IMA" extension).  A
 
 ## Use with a viewer
 
-It's possible to use this server as a backend to the [OHIF Viewer](http://ohif.org) using a configuration like this.
+It's possible to use this server as a backend to the [OHIF Viewer](http://ohif.org) using a configuration like this. (See [this file](https://github.com/OHIF/Viewers/blob/master/platform/viewer/public/config/default.js#L1-L31)).
 
 ```
      const dicomweb_serverConfig = {
