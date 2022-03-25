@@ -815,68 +815,77 @@ async function couchdb(fastify, options) {
   fastify.decorate(
     'processFolder',
     (linkDir, dicomDB) =>
-      new Promise((resolve, reject) => {
+      new Promise(async (resolve, reject) => {
         fastify.log.info(`Processing folder ${linkDir}`);
         // success variable is to check if there was at least one successful processing
         const result = { success: false, errors: [] };
-        fs.readdir(linkDir, async (err, files) => {
-          if (err) {
-            reject(new InternalError(`Reading directory ${linkDir}`, err));
-          } else {
-            try {
-              const promises = [];
-              for (let i = 0; i < files.length; i += 1) {
-                if (files[i] !== '__MACOSX')
-                  if (fs.statSync(`${linkDir}/${files[i]}`).isDirectory() === true)
-                    try {
-                      // eslint-disable-next-line no-await-in-loop
-                      const subdirResult = await fastify.processFolder(
-                        `${linkDir}/${files[i]}`,
-                        dicomDB
-                      );
-                      if (subdirResult && subdirResult.errors && subdirResult.errors.length > 0) {
-                        result.errors = result.errors.concat(subdirResult.errors);
-                      }
-                      if (subdirResult && subdirResult.success) {
-                        result.success = result.success || subdirResult.success;
-                      }
-                    } catch (folderErr) {
-                      reject(folderErr);
+        try {
+          let files = await fs.promises.readdir(linkDir);
+          // sort by timestamp but only if it is not files only
+          // so that we can handle migrating old dcm4chee files and update the segmentation objects with newer versions
+          files = files
+            .map(fileName => ({
+              name: fileName,
+              time: fs.statSync(`${linkDir}/${fileName}`).mtime.getTime(),
+            }))
+            .sort((a, b) => a.time - b.time)
+            .map(file => file.name);
+
+          try {
+            const promises = [];
+            for (let i = 0; i < files.length; i += 1) {
+              if (files[i] !== '__MACOSX')
+                if (fs.statSync(`${linkDir}/${files[i]}`).isDirectory() === true)
+                  try {
+                    // eslint-disable-next-line no-await-in-loop
+                    const subdirResult = await fastify.processFolder(
+                      `${linkDir}/${files[i]}`,
+                      dicomDB
+                    );
+                    if (subdirResult && subdirResult.errors && subdirResult.errors.length > 0) {
+                      result.errors = result.errors.concat(subdirResult.errors);
                     }
-                  else
-                    promises.push(() => {
-                      return (
-                        fastify
-                          .processFile(linkDir, files[i], dicomDB)
-                          // eslint-disable-next-line no-loop-func
-                          .catch(error => {
-                            result.errors.push(error);
-                          })
-                      );
-                    });
-              }
-              fastify.dbPqueue.addAll(promises).then(async values => {
-                try {
-                  for (let i = 0; values.length; i += 1) {
-                    if (
-                      values[i] === undefined ||
-                      (values[i].errors && values[i].errors.length === 0)
-                    ) {
-                      // one success is enough
-                      result.success = result.success || true;
-                      break;
+                    if (subdirResult && subdirResult.success) {
+                      result.success = result.success || subdirResult.success;
                     }
+                  } catch (folderErr) {
+                    reject(folderErr);
                   }
-                  resolve(result);
-                } catch (saveDicomErr) {
-                  reject(saveDicomErr);
-                }
-              });
-            } catch (errDir) {
-              reject(errDir);
+                else
+                  promises.push(() => {
+                    return (
+                      fastify
+                        .processFile(linkDir, files[i], dicomDB)
+                        // eslint-disable-next-line no-loop-func
+                        .catch(error => {
+                          result.errors.push(error);
+                        })
+                    );
+                  });
             }
+            fastify.dbPqueue.addAll(promises).then(async values => {
+              try {
+                for (let i = 0; values.length; i += 1) {
+                  if (
+                    values[i] === undefined ||
+                    (values[i].errors && values[i].errors.length === 0)
+                  ) {
+                    // one success is enough
+                    result.success = result.success || true;
+                    break;
+                  }
+                }
+                resolve(result);
+              } catch (saveDicomErr) {
+                reject(saveDicomErr);
+              }
+            });
+          } catch (errDir) {
+            reject(errDir);
           }
-        });
+        } catch (err) {
+          reject(new InternalError(`Reading directory ${linkDir}`, err));
+        }
       })
   );
 
