@@ -832,7 +832,7 @@ async function couchdb(fastify, options) {
             .map(file => file.name);
 
           try {
-            const promises = [];
+            // const promises = [];
             for (let i = 0; i < files.length; i += 1) {
               if (files[i] !== '__MACOSX')
                 if (fs.statSync(`${linkDir}/${files[i]}`).isDirectory() === true)
@@ -855,6 +855,7 @@ async function couchdb(fastify, options) {
                   try {
                     // eslint-disable-next-line no-await-in-loop
                     const value = await fastify.processFile(linkDir, files[i], dicomDB);
+                    fastify.log.info(`Processing file ${files[i]}`);
                     if (
                       value === undefined ||
                       value.success ||
