@@ -868,6 +868,7 @@ async function couchdb(fastify, options) {
                   }
                 }
             }
+            resolve(result);
             // fastify.dbPqueue.addAll(promises).then(async values => {
             //   try {
             //     for (let i = 0; values.length; i += 1) {
