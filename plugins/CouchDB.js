@@ -851,35 +851,39 @@ async function couchdb(fastify, options) {
                   } catch (folderErr) {
                     reject(folderErr);
                   }
-                else
-                  promises.push(() => {
-                    return (
-                      fastify
-                        .processFile(linkDir, files[i], dicomDB)
-                        // eslint-disable-next-line no-loop-func
-                        .catch(error => {
-                          result.errors.push(error);
-                        })
-                    );
-                  });
-            }
-            fastify.dbPqueue.addAll(promises).then(async values => {
-              try {
-                for (let i = 0; values.length; i += 1) {
-                  if (
-                    values[i] === undefined ||
-                    (values[i].errors && values[i].errors.length === 0)
-                  ) {
-                    // one success is enough
-                    result.success = result.success || true;
-                    break;
+                else {
+                  try {
+                    // eslint-disable-next-line no-await-in-loop
+                    const value = await fastify.processFile(linkDir, files[i], dicomDB);
+                    if (
+                      value === undefined ||
+                      value.success ||
+                      (value.errors && value.errors.length === 0)
+                    )
+                      // one success is enough
+                      result.success = result.success || true;
+                  } catch (error) {
+                    result.errors.push(error);
                   }
                 }
-                resolve(result);
-              } catch (saveDicomErr) {
-                reject(saveDicomErr);
-              }
-            });
+            }
+            // fastify.dbPqueue.addAll(promises).then(async values => {
+            //   try {
+            //     for (let i = 0; values.length; i += 1) {
+            //       if (
+            //         values[i] === undefined ||
+            //         (values[i].errors && values[i].errors.length === 0)
+            //       ) {
+            //         // one success is enough
+            //         result.success = result.success || true;
+            //         break;
+            //       }
+            //     }
+            //     resolve(result);
+            //   } catch (saveDicomErr) {
+            //     reject(saveDicomErr);
+            //   }
+            // });
           } catch (errDir) {
             reject(errDir);
           }
