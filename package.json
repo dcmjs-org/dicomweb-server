@@ -18,7 +18,7 @@
     "fastify-static": "^4.2.4",
     "fs-extra": "^8.1.0",
     "http": "0.0.0",
-    "keycloak-backend": "^2.0.0",
+    "keycloak-backend": "^3.0.0",
     "md5": "^2.2.1",
     "nano": "^8.1.0",
     "p-queue": "^6.2.1",
