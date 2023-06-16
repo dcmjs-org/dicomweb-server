@@ -57,7 +57,7 @@ async function wadoRoutes(fastify) {
       },
     },
 
-    handler: fastify.retrieveInstance,
+    handler: fastify.getWado,
   });
 
   // WADO Retrieve Instance frame

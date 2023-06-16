@@ -1108,6 +1108,11 @@ async function couchdb(fastify, options) {
         endKey.push(request.params.series);
         isFiltered = true;
       }
+      if (request.params.instance) {
+        startKey.push(request.params.instance);
+        endKey.push(request.params.instance);
+        isFiltered = true;
+      }
       for (let i = endKey.length; i < 3; i += 1) endKey.push({});
       let filterOptions = {};
       if (isFiltered) {
