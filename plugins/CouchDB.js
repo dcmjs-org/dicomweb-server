@@ -560,10 +560,12 @@ async function couchdb(fastify, options) {
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
+                  const authAndHost = config.dbServer.replace('http://', '').split('@');
                   framePromises.push(
                     new Promise((rangeResolve, rangeReject) => {
                       const opt = {
-                        hostname: config.dbServer.replace('http://', ''),
+                        hostname: authAndHost[1],
+                        auth: authAndHost[0],
                         port: config.dbPort,
                         path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
