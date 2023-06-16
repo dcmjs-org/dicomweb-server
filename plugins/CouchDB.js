@@ -418,7 +418,7 @@ async function couchdb(fastify, options) {
           const dicomDB = fastify.couch.db.use(config.db);
           const { instance } = request.params;
           const dataset = await fastify.getDicomBuffer(instance, dicomDB);
-          const { data, boundary } = await fastify.packMultipartDicomsInternal(dataset);
+          const { data, boundary } = await fastify.packMultipartDicomsInternal([dataset]);
           // send response
           reply.header(
             'Content-Type',
