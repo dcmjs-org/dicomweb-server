@@ -427,9 +427,18 @@ async function couchdb(fastify, options) {
           reply.header('content-length', Buffer.byteLength(data));
           reply.send(Buffer.from(data));
         } catch (err) {
-          reply.send(
-            new InternalError(`getWado with params ${JSON.stringify(request.params)}`, err)
-          );
+          if (err.statusCode === 404)
+            reply.send(
+              new ResourceNotFoundError(
+                'Instance',
+                request.params.instance || request.query.objectUID,
+                err
+              )
+            );
+          else
+            reply.send(
+              new InternalError(`getWado with params ${JSON.stringify(request.params)}`, err)
+            );
         }
       }
     } catch (err) {
