@@ -1,6 +1,6 @@
 module.exports = {
   env: 'test',
-  dbServer: 'http://localhost',
+  dbServer: 'http://admin:admin@localhost',
   db: 'testdb_dicomweb',
   dbPort: process.env.PORT || 5984,
   auth: 'none',

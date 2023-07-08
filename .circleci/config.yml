@@ -4,8 +4,11 @@ defaults: &defaults
   working_directory: ~/repo
   docker:
     - image: circleci/node:latest
-    - image: couchdb:2.3.1
+    - image: ibmcom/couchdb3:latest
       command:
+      environment:
+        COUCHDB_USER: "admin"
+        COUCHDB_PASSWORD: "admin"
 
 jobs:
   test:
