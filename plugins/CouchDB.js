@@ -393,10 +393,53 @@ async function couchdb(fastify, options) {
       if (request.query.frame) fastify.retrieveInstanceFrames(request, reply);
       else {
         const dicomDB = fastify.couch.db.use(config.db);
-        const instance = request.params.instance || request.query.objectUID; // for instance rs and uri
+        const instance = request.query.objectUID;
         reply.header('Content-Disposition', `attachment; filename=${instance}.dcm`);
         const stream = await fastify.getDicomFileAsStream(instance, dicomDB);
         reply.code(200).send(stream);
+      }
+    } catch (err) {
+      reply.send(
+        new ResourceNotFoundError(
+          'Instance',
+          request.params.instance || request.query.objectUID,
+          err
+        )
+      );
+    }
+  });
+
+  fastify.decorate('retrieveInstanceRS', async (request, reply) => {
+    try {
+      // if the query params have frame use retrieveInstanceFrames instead
+      if (request.params.frames) fastify.retrieveInstanceFrames(request, reply);
+      else {
+        try {
+          const dicomDB = fastify.couch.db.use(config.db);
+          const { instance } = request.params;
+          const dataset = await fastify.getDicomBuffer(instance, dicomDB);
+          const { data, boundary } = await fastify.packMultipartDicomsInternal([dataset]);
+          // send response
+          reply.header(
+            'Content-Type',
+            `multipart/related; type=application/dicom; boundary=${boundary}`
+          );
+          reply.header('content-length', Buffer.byteLength(data));
+          reply.send(Buffer.from(data));
+        } catch (err) {
+          if (err.statusCode === 404)
+            reply.send(
+              new ResourceNotFoundError(
+                'Instance',
+                request.params.instance || request.query.objectUID,
+                err
+              )
+            );
+          else
+            reply.send(
+              new InternalError(`getWado with params ${JSON.stringify(request.params)}`, err)
+            );
+        }
       }
     } catch (err) {
       reply.send(
@@ -526,10 +569,12 @@ async function couchdb(fastify, options) {
                   fastify.log.info(
                     `headerSize: ${headerSize}, frameNo: ${frameNo}, range: ${range}`
                   );
+                  const authAndHost = config.dbServer.replace('http://', '').split('@');
                   framePromises.push(
                     new Promise((rangeResolve, rangeReject) => {
                       const opt = {
-                        hostname: config.dbServer.replace('http://', ''),
+                        hostname: authAndHost[1],
+                        auth: authAndHost[0],
                         port: config.dbPort,
                         path: `/${config.db}/${id}/object.dcm`,
                         method: 'GET',
