@@ -8,7 +8,7 @@ const dcmjs = require('dcmjs');
 const Axios = require('axios');
 const http = require('http');
 const fs = require('fs');
-const CryptoJS = require('crypto');
+const CryptoJS = require('crypto-js');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
