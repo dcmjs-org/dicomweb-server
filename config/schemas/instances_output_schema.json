@@ -167,6 +167,60 @@
             "vr"
           ]
         },
+        "002001041": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": 
+                {
+                  "type": "number"
+                }
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00200032": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": 
+                {
+                  "type": "number"
+                }
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
+        "00200037": {
+          "type": "object",
+          "properties": {
+            "vr": {
+              "type": "string"
+            },
+            "Value": {
+              "type": "array",
+              "items": 
+                {
+                  "type": "number"
+                }
+            }
+          },
+          "required": [
+            "vr"
+          ]
+        },
         "00280010": {
           "type": "object",
           "properties": {

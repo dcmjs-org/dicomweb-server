@@ -51,7 +51,10 @@ var instanceTags = [
     ['numberOfFrames', '00280008', '', 'IS', 0],
     ['studyUID', '0020000D', '', 'UI', 1],
     ['seriesUID', '0020000E', '', 'UI', 1],
-    ['retrieveAETitle', '00080054', '', 'AE', 1]
+    ['retrieveAETitle', '00080054', '', 'AE', 1],
+    ['sliceLocation', '00201041', '', 'DS', 1],
+    ['imagePositionPatient', '00200032', '', 'DS', 1],
+    ['imageOrientationPatient', '00200037', '', 'DS', 1]
 ];
 
 var patientTags = [
