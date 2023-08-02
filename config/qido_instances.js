@@ -23,5 +23,5 @@ module.exports = function applyView(doc) {
 
     // 0020,0037 orientation   
     // 0020,0032 position  
-    emit([studyUID, seriesUID, instanceUID, JSON.stringify([key['00080005'],key['00080016'],key['00080018'],key['00080056'],key['00080201'],key['00081190'],key['00200013'],key['00280010'],key['00280011'],key['00280100'],key['00280008'],key['0020000D'],key['0020000E'],key['00080054'],key['00201041'],key['00200032'],,key['00200037']])], null)
+    emit([studyUID, seriesUID, instanceUID, JSON.stringify([key['00080005'],key['00080016'],key['00080018'],key['00080056'],key['00080201'],key['00081190'],key['00200013'],key['00280010'],key['00280011'],key['00280100'],key['00280008'],key['0020000D'],key['0020000E'],key['00080054'],key['00201041'],key['00200032'],key['00200037']])], null)
 }
