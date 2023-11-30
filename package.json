@@ -6,7 +6,7 @@
   "main": "server.js",
   "dependencies": {
     "atob": "^2.1.2",
-    "axios": "^0.21.1",
+    "axios": "^1.6.0",
     "chai": "^4.2.0",
     "chai-http": "^4.3.0",
     "dcmjs": "0.29.11",
