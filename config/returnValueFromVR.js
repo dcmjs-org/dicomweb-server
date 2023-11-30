@@ -45,12 +45,19 @@ module.exports = function returnValueFromVR(dataset, field, tag, fieldVR, requir
   switch (vr) {
     case "PN":
       if (Value && Value[0]) {
-        if (withVR) {
-          result.Value = [
-            {
-              "Alphabetic": Value[0]
-            },
-          ];
+        if (withVR) {          
+          if (Value[0].Alphabetic)
+            result.Value = [
+              {
+                Alphabetic: Value[0].Alphabetic,
+              },
+            ];
+          else
+            result.Value = [
+              {
+                "Alphabetic": Value[0]
+              },
+            ];
         } else result = Value;
       }
       break;
