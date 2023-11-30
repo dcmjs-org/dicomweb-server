@@ -106,11 +106,18 @@ async function couchdb(fastify, options) {
         switch (tags[j][3]) {
           case 'PN':
             if (Value && Value[0]) {
-              result[tags[j][1]].Value = [
-                {
-                  Alphabetic: Value[0],
-                },
-              ];
+              if (Value[0].Alphabetic)
+                result[tags[j][1]].Value = [
+                  {
+                    Alphabetic: Value[0].Alphabetic,
+                  },
+                ];
+              else
+                result[tags[j][1]].Value = [
+                  {
+                    Alphabetic: Value[0],
+                  },
+                ];
             }
 
             break;
