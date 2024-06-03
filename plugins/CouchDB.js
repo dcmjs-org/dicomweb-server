@@ -8,7 +8,7 @@ const dcmjs = require('dcmjs');
 const Axios = require('axios');
 const http = require('http');
 const fs = require('fs');
-const md5 = require('md5');
+const hash = require('object-hash');
 
 const config = require('../config/index');
 const viewsjs = require('../config/views');
@@ -812,7 +812,7 @@ async function couchdb(fastify, options) {
     if (dicomDB === undefined) dicomDB = fastify.couch.db.use(config.db);
     // TODO: Check if this needs to be Buffer or not.
     const body = Buffer.from(arrayBuffer);
-    const incomingMd5 = md5(body);
+    const incomingMd5 = hash(body);
     const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer, {});
     const couchDoc = {
       _id: dicomData.dict['00080018'].Value[0],
